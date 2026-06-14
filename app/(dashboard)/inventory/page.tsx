@@ -35,5 +35,6 @@ export default async function InventoryPage() {
     )
   }
 
-  return <InventoryClient rows={rows ?? []} warehouses={warehouses ?? []} />
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return <InventoryClient rows={(rows as any[]) ?? []} warehouses={warehouses ?? []} />
 }
