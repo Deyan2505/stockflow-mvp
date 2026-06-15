@@ -39,7 +39,7 @@ export async function recordMovement(input: MovementInput): Promise<void> {
 
     const available = Number(bal?.quantity_available ?? 0)
     if (quantity > available) {
-      const unit = (bal?.products as { unit: string } | null)?.unit ?? 'бр.'
+      const unit = (bal?.products as unknown as { unit: string } | null)?.unit ?? 'бр.'
       throw new Error(`Няма достатъчна наличност. Налични са само ${available} ${unit}.`)
     }
   }
