@@ -114,7 +114,7 @@ export function LowStockClient({ items, warehouses }: Props) {
     })
 
   const handleExport = () => {
-    const headers = ['Продукт', 'SKU', 'Единица', 'Минимално количество', 'Обща наличност', 'Недостиг', 'Приблизителна стойност на недостига (лв.)', 'Брой локации']
+    const headers = ['Продукт', 'SKU', 'Единица', 'Минимално количество', 'Обща наличност', 'Недостиг', 'Приблизителна стойност на недостига (€)', 'Брой локации']
     exportToCSV(`stockflow_low_stock_${todayStr()}.csv`, headers, buildLowStockRows())
   }
 
@@ -126,7 +126,7 @@ export function LowStockClient({ items, warehouses }: Props) {
       { header: 'Минимално количество', width: 22 },
       { header: 'Обща наличност', width: 18 },
       { header: 'Недостиг', width: 12 },
-      { header: 'Приблизителна стойност на недостига (лв.)', width: 38 },
+      { header: 'Приблизителна стойност на недостига (€)', width: 38 },
       { header: 'Брой локации', width: 14 },
     ]
     exportToXLSX(`stockflow_low_stock_${todayStr()}.xlsx`, 'Под минимум', columns, buildLowStockRows())
@@ -305,7 +305,7 @@ export function LowStockClient({ items, warehouses }: Props) {
                           </span>
                         </td>
                         <td className="px-4 py-3 font-mono text-xs text-gray-500 dark:text-gray-400">
-                          {shortageValue != null ? `${shortageValue} лв.` : '—'}
+                          {shortageValue != null ? `${shortageValue} €` : '—'}
                         </td>
                         <td className="px-4 py-3 text-xs text-gray-400 dark:text-gray-500">
                           {item.locations.length}

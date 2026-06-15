@@ -202,7 +202,7 @@ export function InventoryClient({ rows, warehouses }: Props) {
     })
 
   const handleExport = () => {
-    const headers = ['Продукт', 'SKU', 'Склад', 'Локация', 'Налично количество', 'Единица', 'Минимално количество', 'Статус', 'Приблизителна стойност (лв.)']
+    const headers = ['Продукт', 'SKU', 'Склад', 'Локация', 'Налично количество', 'Единица', 'Минимално количество', 'Статус', 'Приблизителна стойност (€)']
     exportToCSV(`stockflow_inventory_${todayStr()}.csv`, headers, buildInventoryRows())
   }
 
@@ -216,7 +216,7 @@ export function InventoryClient({ rows, warehouses }: Props) {
       { header: 'Единица', width: 10 },
       { header: 'Минимално количество', width: 22 },
       { header: 'Статус', width: 16 },
-      { header: 'Приблизителна стойност (лв.)', width: 26 },
+      { header: 'Приблизителна стойност (€)', width: 26 },
     ]
     exportToXLSX(`stockflow_inventory_${todayStr()}.xlsx`, 'Наличност', columns, buildInventoryRows())
   }
@@ -431,7 +431,7 @@ export function InventoryClient({ rows, warehouses }: Props) {
                       </span>
                     </td>
                     <td className="px-4 py-3 font-mono text-xs text-gray-500 dark:text-gray-400">
-                      {approxValue != null ? `${approxValue} лв.` : '—'}
+                      {approxValue != null ? `${approxValue} €` : '—'}
                     </td>
                   </tr>
                 )
