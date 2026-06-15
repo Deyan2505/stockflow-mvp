@@ -4,7 +4,7 @@ import { useState, useTransition, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { submitMovement } from './actions'
-import type { ProductOption, LocationOption, BalanceRow, Movement, MovementInput } from './actions'
+import type { ProductOption, LocationOption, BalanceRow, Movement, MovementInput, MovementResult } from './actions'
 import { useT } from '@/lib/i18n'
 
 type Props = {
@@ -98,6 +98,13 @@ export function MovementsClient({ products, locations, movements, balances }: Pr
     if ((tab === 'IN' || tab === 'TRANSFER') && !form.to_location_id) { setError(m.errToLoc); return }
     if (tab === 'TRANSFER' && form.from_location_id === form.to_location_id) { setError(m.errSameLoc); return }
 
+    // Client-side stock check — instant, no server round-trip needed
+    if ((tab === 'OUT' || tab === 'TRANSFER') && availableStock !== null && qty > availableStock) {
+      const unit = productMap.get(form.product_id)?.unit ?? ''
+      setError(m.errInsufficientStock(availableStock, unit))
+      return
+    }
+
     const input: MovementInput = {
       movement_type: tab,
       product_id: form.product_id,
@@ -108,14 +115,14 @@ export function MovementsClient({ products, locations, movements, balances }: Pr
     }
 
     startTransition(async () => {
-      try {
-        await submitMovement(input)
-        setSuccess(SUCCESS_MSG[tab])
-        setForm(emptyForm())
-        router.refresh()
-      } catch (err) {
-        setError(err instanceof Error ? err.message : m.errGeneric)
+      const result: MovementResult = await submitMovement(input)
+      if (!result.success) {
+        setError(result.error)
+        return
       }
+      setSuccess(SUCCESS_MSG[tab])
+      setForm(emptyForm())
+      router.refresh()
     })
   }
 

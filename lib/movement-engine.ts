@@ -27,6 +27,23 @@ export async function recordMovement(input: MovementInput): Promise<void> {
 
   const sb = createAdminClient()
 
+  // Server-side stock check — safety net even if client validation is bypassed
+  if ((movement_type === 'OUT' || movement_type === 'TRANSFER') && from_location_id) {
+    const { data: bal } = await sb
+      .from('inventory_balances')
+      .select('quantity_available, products(unit)')
+      .eq('company_id', CO)
+      .eq('product_id', product_id)
+      .eq('location_id', from_location_id)
+      .maybeSingle()
+
+    const available = Number(bal?.quantity_available ?? 0)
+    if (quantity > available) {
+      const unit = (bal?.products as { unit: string } | null)?.unit ?? 'бр.'
+      throw new Error(`Няма достатъчна наличност. Налични са само ${available} ${unit}.`)
+    }
+  }
+
   // Single atomic DB call: availability check + INSERT movement + UPSERT balances
   // Everything happens in one PostgreSQL transaction (migration 002_movement_rpc.sql).
   // If any step fails the entire operation rolls back — no orphaned records.

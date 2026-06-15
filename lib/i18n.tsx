@@ -96,6 +96,7 @@ const dict = {
       errProduct: 'Избери продукт', errQty: 'Количеството трябва да е над 0',
       errFromLoc: 'Избери изходна локация', errToLoc: 'Избери входна локация',
       errSameLoc: 'Изходната и входната локация трябва да са различни',
+      errInsufficientStock: (n: number, unit: string) => `Няма достатъчна наличност. Налични са само ${n} ${unit}.`,
       errGeneric: 'Грешка, опитай отново',
     },
     inventory: {
@@ -200,6 +201,7 @@ const dict = {
       errProduct: 'Select a product', errQty: 'Quantity must be greater than 0',
       errFromLoc: 'Select from location', errToLoc: 'Select to location',
       errSameLoc: 'From and to locations must be different',
+      errInsufficientStock: (n: number, unit: string) => `Insufficient stock. Only ${n} ${unit} available.`,
       errGeneric: 'Error, please try again',
     },
     inventory: {

@@ -40,9 +40,16 @@ export type Movement = {
   created_at: string
 }
 
-export async function submitMovement(input: MovementInput): Promise<void> {
-  await recordMovement(input)
-  revalidatePath('/')
-  revalidatePath('/movements')
-  revalidatePath('/inventory')
+export type MovementResult = { success: true } | { success: false; error: string }
+
+export async function submitMovement(input: MovementInput): Promise<MovementResult> {
+  try {
+    await recordMovement(input)
+    revalidatePath('/')
+    revalidatePath('/movements')
+    revalidatePath('/inventory')
+    return { success: true }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Грешка, опитай отново' }
+  }
 }
