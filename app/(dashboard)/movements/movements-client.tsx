@@ -398,22 +398,24 @@ export function MovementsClient({ products, locations, movements, balances }: Pr
                   ))}
                 </select>
 
-                <input
-                  type="date"
-                  value={filters.dateFrom}
-                  onChange={(e) => setFilter('dateFrom', e.target.value)}
-                  placeholder={m.filterDateFrom}
-                  title={m.filterDateFrom}
-                  className={filterSelectClass}
-                />
-                <input
-                  type="date"
-                  value={filters.dateTo}
-                  onChange={(e) => setFilter('dateTo', e.target.value)}
-                  placeholder={m.filterDateTo}
-                  title={m.filterDateTo}
-                  className={filterSelectClass}
-                />
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-xs text-gray-400 dark:text-gray-500">{m.filterDateFrom}</span>
+                  <input
+                    type="date"
+                    value={filters.dateFrom}
+                    onChange={(e) => setFilter('dateFrom', e.target.value)}
+                    className={filterSelectClass}
+                  />
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-xs text-gray-400 dark:text-gray-500">{m.filterDateTo}</span>
+                  <input
+                    type="date"
+                    value={filters.dateTo}
+                    onChange={(e) => setFilter('dateTo', e.target.value)}
+                    className={filterSelectClass}
+                  />
+                </div>
 
                 <select
                   value={filters.referenceType}
