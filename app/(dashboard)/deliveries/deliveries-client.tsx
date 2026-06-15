@@ -4,6 +4,8 @@ import { useState, useTransition, useMemo } from 'react'
 import { Search } from 'lucide-react'
 import { type Delivery, type DeliveryResult, cancelDelivery } from './actions'
 import { DeliveryModal } from './delivery-modal'
+import { ReceiveModal } from './receive-modal'
+import { DeliveryDetailModal, type DeliveryMovement } from './delivery-detail-modal'
 import { cn } from '@/lib/utils'
 import { useT } from '@/lib/i18n'
 
@@ -12,15 +14,18 @@ type Props = {
   suppliers: { id: string; name: string }[]
   products: { id: string; name: string; unit: string }[]
   locations: { id: string; code: string }[]
+  deliveryMovements: DeliveryMovement[]
 }
 
-export function DeliveriesClient({ deliveries, suppliers, products, locations }: Props) {
+export function DeliveriesClient({ deliveries, suppliers, products, locations, deliveryMovements }: Props) {
   const { t } = useT()
   const d = t.deliveries
 
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [modal, setModal] = useState<Delivery | null | 'new'>(null)
+  const [receiveModal, setReceiveModal] = useState<Delivery | null>(null)
+  const [detailModal, setDetailModal] = useState<Delivery | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
@@ -61,6 +66,14 @@ export function DeliveriesClient({ deliveries, suppliers, products, locations }:
     }
   }
 
+  const handleReceiveClose = (msg?: string) => {
+    setReceiveModal(null)
+    if (msg) {
+      setSuccessMsg(msg)
+      setTimeout(() => setSuccessMsg(null), 3500)
+    }
+  }
+
   const statusBadge = (status: Delivery['status']) => {
     const colorMap: Record<string, string> = {
       draft: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
@@ -83,7 +96,12 @@ export function DeliveriesClient({ deliveries, suppliers, products, locations }:
     )
   }
 
+  // Only draft and expected can be edited or cancelled
   const canEdit = (status: Delivery['status']) => status === 'draft' || status === 'expected'
+
+  // draft, expected, and partially_received can still receive more stock
+  const canReceive = (status: Delivery['status']) =>
+    status === 'draft' || status === 'expected' || status === 'partially_received'
 
   return (
     <div>
@@ -186,6 +204,25 @@ export function DeliveriesClient({ deliveries, suppliers, products, locations }:
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
+                      {/* Detail is always available */}
+                      <button
+                        onClick={() => setDetailModal(item)}
+                        className="text-xs text-gray-500 hover:underline dark:text-gray-400"
+                      >
+                        {d.detailBtn}
+                      </button>
+
+                      {/* Receive: draft / expected / partially_received */}
+                      {canReceive(item.status) && (
+                        <button
+                          onClick={() => setReceiveModal(item)}
+                          className="text-xs font-medium text-green-600 hover:underline dark:text-green-400"
+                        >
+                          {d.receiveBtn}
+                        </button>
+                      )}
+
+                      {/* Edit / Cancel: draft / expected only */}
                       {canEdit(item.status) && (
                         <button
                           onClick={() => setModal(item)}
@@ -212,6 +249,7 @@ export function DeliveriesClient({ deliveries, suppliers, products, locations }:
         </table>
       </div>
 
+      {/* Edit / create modal */}
       {modal !== null && (
         <DeliveryModal
           delivery={modal === 'new' ? null : modal}
@@ -219,6 +257,27 @@ export function DeliveriesClient({ deliveries, suppliers, products, locations }:
           products={products}
           locations={locations}
           onClose={handleModalClose}
+        />
+      )}
+
+      {/* Receive modal */}
+      {receiveModal !== null && (
+        <ReceiveModal
+          delivery={receiveModal}
+          products={products}
+          locations={locations}
+          onClose={handleReceiveClose}
+        />
+      )}
+
+      {/* Detail modal */}
+      {detailModal !== null && (
+        <DeliveryDetailModal
+          delivery={detailModal}
+          movements={deliveryMovements}
+          products={products}
+          locations={locations}
+          onClose={() => setDetailModal(null)}
         />
       )}
     </div>

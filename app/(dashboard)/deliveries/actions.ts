@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { recordMovement } from '@/lib/movement-engine'
 
 const CO = process.env.DEMO_COMPANY_ID!
 
@@ -146,5 +147,135 @@ export async function cancelDelivery(id: string): Promise<DeliveryResult> {
     return { success: true }
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : 'Грешка, опитай отново' }
+  }
+}
+
+// ─── Receive delivery (F-021) ─────────────────────────────────────────────────
+
+export type ReceiveItemInput = {
+  item_id: string
+  product_id: string
+  quantity_to_receive: number
+  location_id: string
+}
+
+export type ReceiveDeliveryInput = {
+  delivery_id: string
+  delivery_number: string
+  items: ReceiveItemInput[]
+}
+
+export type ReceiveResult =
+  | { success: true; newStatus: 'received' | 'partially_received' }
+  | { success: false; error: string }
+
+export async function receiveDelivery(input: ReceiveDeliveryInput): Promise<ReceiveResult> {
+  try {
+    const sb = createAdminClient()
+
+    // Guard: re-read delivery status from DB to prevent double-receive
+    const { data: delivery, error: delErr } = await sb
+      .from('incoming_deliveries')
+      .select('id, status, delivery_number')
+      .eq('id', input.delivery_id)
+      .eq('company_id', CO)
+      .single()
+
+    if (delErr || !delivery) throw new Error('Доставката не е намерена')
+    if (delivery.status === 'received')
+      throw new Error('Тази доставка вече е получена.')
+    if (delivery.status === 'cancelled')
+      throw new Error('Отменена доставка не може да бъде приемана.')
+
+    // Authoritative item state from DB (received_quantity may differ from what UI sent)
+    const { data: dbItems, error: itemsErr } = await sb
+      .from('incoming_delivery_items')
+      .select('id, expected_quantity, received_quantity, product_id, location_id')
+      .eq('delivery_id', input.delivery_id)
+      .eq('company_id', CO)
+
+    if (itemsErr) throw new Error(itemsErr.message)
+    if (!dbItems?.length) throw new Error('Доставката няма продукти')
+
+    const note = `Приемане от доставка #${delivery.delivery_number}`
+
+    // Process each item: movement first, then received_quantity update
+    for (const receiveItem of input.items) {
+      if (!receiveItem.quantity_to_receive || receiveItem.quantity_to_receive <= 0) continue
+
+      const dbItem = dbItems.find((i) => i.id === receiveItem.item_id)
+      if (!dbItem) continue
+
+      // Cap at remaining (safety net against stale UI data)
+      const maxReceivable =
+        Number(dbItem.expected_quantity) - Number(dbItem.received_quantity)
+      const actualQty = Math.min(receiveItem.quantity_to_receive, maxReceivable)
+      if (actualQty <= 0) continue
+
+      // Atomic: creates stock movement + upserts inventory_balances via RPC
+      await recordMovement({
+        movement_type: 'IN',
+        product_id: dbItem.product_id,
+        from_location_id: null,
+        to_location_id: receiveItem.location_id,
+        quantity: actualQty,
+        note,
+        reference_type: 'incoming_delivery',
+        reference_id: input.delivery_id,
+      })
+
+      // Update received_quantity immediately after each successful movement
+      const newReceivedQty = Number(dbItem.received_quantity) + actualQty
+      const { error: updateErr } = await sb
+        .from('incoming_delivery_items')
+        .update({ received_quantity: newReceivedQty })
+        .eq('id', receiveItem.item_id)
+        .eq('company_id', CO)
+
+      if (updateErr) throw new Error(updateErr.message)
+
+      // Keep in-memory state accurate for next iterations
+      dbItem.received_quantity = newReceivedQty
+    }
+
+    // Determine new delivery status
+    const { data: finalItems } = await sb
+      .from('incoming_delivery_items')
+      .select('expected_quantity, received_quantity')
+      .eq('delivery_id', input.delivery_id)
+      .eq('company_id', CO)
+
+    const allReceived =
+      finalItems?.every(
+        (i) => Number(i.received_quantity) >= Number(i.expected_quantity)
+      ) ?? false
+    const anyReceived = finalItems?.some((i) => Number(i.received_quantity) > 0) ?? false
+
+    const newStatus = allReceived ? 'received' : 'partially_received'
+
+    const updatePayload: Record<string, unknown> = { status: newStatus }
+    if (anyReceived) {
+      updatePayload.received_date = new Date().toISOString().split('T')[0]
+    }
+
+    const { error: statusErr } = await sb
+      .from('incoming_deliveries')
+      .update(updatePayload)
+      .eq('id', input.delivery_id)
+      .eq('company_id', CO)
+
+    if (statusErr) throw new Error(statusErr.message)
+
+    revalidatePath('/deliveries')
+    revalidatePath('/movements')
+    revalidatePath('/inventory')
+    revalidatePath('/')
+
+    return { success: true, newStatus }
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Грешка, опитай отново',
+    }
   }
 }
