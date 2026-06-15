@@ -14,7 +14,7 @@ export default async function InventoryPage() {
         .from('inventory_balances')
         .select(
           `product_id, location_id, quantity_available,
-           products ( name, sku, unit, min_quantity ),
+           products ( name, sku, barcode, category, unit, min_quantity, cost_price ),
            locations ( code, zone, warehouse_id, warehouses ( name ) )`
         )
         .eq('company_id', CO)

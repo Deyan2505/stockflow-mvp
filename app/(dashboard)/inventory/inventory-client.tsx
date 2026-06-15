@@ -9,7 +9,15 @@ type InventoryRow = {
   product_id: string
   location_id: string
   quantity_available: number
-  products: { name: string; sku: string | null; unit: string; min_quantity: number } | null
+  products: {
+    name: string
+    sku: string | null
+    barcode: string | null
+    category: string | null
+    unit: string
+    min_quantity: number
+    cost_price: number | null
+  } | null
   locations: {
     code: string
     zone: string | null
@@ -27,10 +35,27 @@ type Props = {
 
 type StockStatus = 'ok' | 'low' | 'zero'
 
+type Filters = {
+  search: string
+  productId: string
+  warehouseId: string
+  locationId: string
+  status: '' | StockStatus
+  category: string
+}
+
+function emptyFilters(): Filters {
+  return { search: '', productId: '', warehouseId: '', locationId: '', status: '', category: '' }
+}
+
 function stockStatus(qty: number, min: number): StockStatus {
   if (qty <= 0) return 'zero'
-  if (qty < min) return 'low'
+  if (min > 0 && qty < min) return 'low'
   return 'ok'
+}
+
+function hasActiveFilters(f: Filters): boolean {
+  return !!(f.search || f.productId || f.warehouseId || f.locationId || f.status || f.category)
 }
 
 const STATUS_BADGE: Record<StockStatus, string> = {
@@ -49,27 +74,85 @@ export function InventoryClient({ rows, warehouses }: Props) {
   const { t } = useT()
   const inv = t.inventory
 
-  const [search, setSearch] = useState('')
-  const [warehouseFilter, setWarehouseFilter] = useState('all')
-  const [showZero, setShowZero] = useState(false)
+  const [filters, setFilters] = useState<Filters>(emptyFilters())
+
+  const setFilter = <K extends keyof Filters>(k: K, v: Filters[K]) => {
+    setFilters((f) => {
+      const next = { ...f, [k]: v }
+      // reset location when warehouse changes and location no longer belongs to it
+      if (k === 'warehouseId' && f.locationId) {
+        const locRow = rows.find((r) => r.location_id === f.locationId)
+        if (locRow && locRow.locations?.warehouse_id !== v) {
+          next.locationId = ''
+        }
+      }
+      return next
+    })
+  }
+
+  // Unique products from rows
+  const productOptions = useMemo(() => {
+    const seen = new Map<string, string>()
+    for (const r of rows) {
+      if (r.products && !seen.has(r.product_id)) seen.set(r.product_id, r.products.name)
+    }
+    return Array.from(seen.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name, 'bg'))
+  }, [rows])
+
+  // Unique locations from rows, filtered by selected warehouse
+  const locationOptions = useMemo(() => {
+    const seen = new Map<string, { id: string; code: string; warehouseId: string }>()
+    for (const r of rows) {
+      if (r.locations && !seen.has(r.location_id)) {
+        seen.set(r.location_id, {
+          id: r.location_id,
+          code: r.locations.code,
+          warehouseId: r.locations.warehouse_id,
+        })
+      }
+    }
+    return Array.from(seen.values())
+      .filter((l) => !filters.warehouseId || l.warehouseId === filters.warehouseId)
+      .sort((a, b) => a.code.localeCompare(b.code))
+  }, [rows, filters.warehouseId])
+
+  // Unique non-empty categories from rows
+  const categoryOptions = useMemo(() => {
+    const seen = new Set<string>()
+    for (const r of rows) {
+      if (r.products?.category) seen.add(r.products.category)
+    }
+    return Array.from(seen).sort((a, b) => a.localeCompare(b, 'bg'))
+  }, [rows])
 
   const filtered = useMemo(() => {
-    const q = search.toLowerCase()
+    const q = filters.search.toLowerCase()
     return rows.filter((r) => {
-      const matchSearch =
-        !q ||
-        (r.products?.name ?? '').toLowerCase().includes(q) ||
-        (r.products?.sku ?? '').toLowerCase().includes(q)
-      const matchWarehouse = warehouseFilter === 'all' || r.locations?.warehouse_id === warehouseFilter
-      const matchZero = showZero || r.quantity_available > 0
-      return matchSearch && matchWarehouse && matchZero
+      if (q) {
+        const matchName = (r.products?.name ?? '').toLowerCase().includes(q)
+        const matchSku = (r.products?.sku ?? '').toLowerCase().includes(q)
+        const matchBarcode = (r.products?.barcode ?? '').toLowerCase().includes(q)
+        if (!matchName && !matchSku && !matchBarcode) return false
+      }
+      if (filters.productId && r.product_id !== filters.productId) return false
+      if (filters.warehouseId && r.locations?.warehouse_id !== filters.warehouseId) return false
+      if (filters.locationId && r.location_id !== filters.locationId) return false
+      if (filters.status) {
+        const min = r.products?.min_quantity ?? 0
+        if (stockStatus(r.quantity_available, min) !== filters.status) return false
+      }
+      if (filters.category && (r.products?.category ?? '') !== filters.category) return false
+      return true
     })
-  }, [rows, search, warehouseFilter, showZero])
+  }, [rows, filters])
 
+  // Summary cards always based on all rows
   const totalWithStock = rows.filter((r) => r.quantity_available > 0).length
   const belowMin = rows.filter((r) => {
     const min = r.products?.min_quantity ?? 0
-    return r.quantity_available > 0 && r.quantity_available < min
+    return min > 0 && r.quantity_available > 0 && r.quantity_available < min
   }).length
   const zeroStock = rows.filter((r) => r.quantity_available <= 0).length
 
@@ -78,6 +161,11 @@ export function InventoryClient({ rows, warehouses }: Props) {
     low: inv.statusLow,
     zero: inv.statusZero,
   }
+
+  const active = hasActiveFilters(filters)
+
+  const filterSelectClass =
+    'rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white'
 
   return (
     <div>
@@ -119,31 +207,94 @@ export function InventoryClient({ rows, warehouses }: Props) {
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="mb-4 flex items-center gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-          <input
-            type="text" placeholder={inv.searchPlaceholder} value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-lg border border-gray-200 py-2 pl-9 pr-3 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white dark:placeholder-gray-500"
-          />
+      {/* Filter area */}
+      <div className="mb-4 rounded-xl border border-gray-100 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
+        {/* Row 1: search + clear */}
+        <div className="mb-3 flex items-center gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              placeholder={inv.searchPlaceholder}
+              value={filters.search}
+              onChange={(e) => setFilter('search', e.target.value)}
+              className="w-full rounded-lg border border-gray-200 py-2 pl-9 pr-3 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500"
+            />
+          </div>
+          {active && (
+            <button
+              onClick={() => setFilters(emptyFilters())}
+              className="shrink-0 text-sm text-blue-600 hover:underline dark:text-blue-400"
+            >
+              {inv.clearFilters}
+            </button>
+          )}
         </div>
 
-        <select
-          value={warehouseFilter} onChange={(e) => setWarehouseFilter(e.target.value)}
-          className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-        >
-          <option value="all">{inv.allWarehouses}</option>
-          {warehouses.map((w) => (
-            <option key={w.id} value={w.id}>{w.name}</option>
-          ))}
-        </select>
+        {/* Row 2: dropdowns */}
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            value={filters.productId}
+            onChange={(e) => setFilter('productId', e.target.value)}
+            className={filterSelectClass}
+          >
+            <option value="">{inv.filterProduct}</option>
+            {productOptions.map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
 
-        <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-          <input type="checkbox" checked={showZero} onChange={(e) => setShowZero(e.target.checked)} className="rounded border-gray-300" />
-          {inv.showZero}
-        </label>
+          <select
+            value={filters.warehouseId}
+            onChange={(e) => setFilter('warehouseId', e.target.value)}
+            className={filterSelectClass}
+          >
+            <option value="">{inv.allWarehouses}</option>
+            {warehouses.map((w) => (
+              <option key={w.id} value={w.id}>{w.name}</option>
+            ))}
+          </select>
+
+          <select
+            value={filters.locationId}
+            onChange={(e) => setFilter('locationId', e.target.value)}
+            className={filterSelectClass}
+          >
+            <option value="">{inv.filterLocation}</option>
+            {locationOptions.map((l) => (
+              <option key={l.id} value={l.id}>{l.code}</option>
+            ))}
+          </select>
+
+          <select
+            value={filters.status}
+            onChange={(e) => setFilter('status', e.target.value as Filters['status'])}
+            className={filterSelectClass}
+          >
+            <option value="">{inv.filterStatusAll}</option>
+            <option value="ok">{inv.statusOk}</option>
+            <option value="low">{inv.statusLow}</option>
+            <option value="zero">{inv.statusZero}</option>
+          </select>
+
+          {categoryOptions.length > 0 && (
+            <select
+              value={filters.category}
+              onChange={(e) => setFilter('category', e.target.value)}
+              className={filterSelectClass}
+            >
+              <option value="">{inv.filterCategory}</option>
+              {categoryOptions.map((cat) => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
+          )}
+        </div>
+
+        {/* Counter */}
+        <p className="mt-3 text-xs text-gray-400 dark:text-gray-500">
+          {inv.shown(filtered.length, rows.length)}
+        </p>
       </div>
 
       {/* Table */}
@@ -159,22 +310,33 @@ export function InventoryClient({ rows, warehouses }: Props) {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
-            {filtered.length === 0 ? (
+            {rows.length === 0 ? (
               <tr>
                 <td colSpan={inv.cols.length} className="px-4 py-16 text-center">
-                  <p className="text-sm text-gray-400 dark:text-gray-500">
-                    {rows.length === 0 ? inv.noItems : inv.noResults}
-                  </p>
-                  {rows.length === 0 && (
-                    <p className="mt-1 text-xs text-gray-300 dark:text-gray-600">{inv.autoUpdate}</p>
-                  )}
+                  <p className="text-sm text-gray-400 dark:text-gray-500">{inv.noItems}</p>
+                  <p className="mt-1 text-xs text-gray-300 dark:text-gray-600">{inv.autoUpdate}</p>
+                </td>
+              </tr>
+            ) : filtered.length === 0 ? (
+              <tr>
+                <td colSpan={inv.cols.length} className="px-4 py-12 text-center">
+                  <p className="text-sm text-gray-400 dark:text-gray-500">{inv.noFilteredItems}</p>
                 </td>
               </tr>
             ) : (
               filtered.map((r) => {
-                const status = stockStatus(r.quantity_available, r.products?.min_quantity ?? 0)
+                const min = r.products?.min_quantity ?? 0
+                const status = stockStatus(r.quantity_available, min)
+                const approxValue =
+                  r.products?.cost_price != null
+                    ? (Number(r.products.cost_price) * Number(r.quantity_available)).toFixed(2)
+                    : null
+
                 return (
-                  <tr key={`${r.product_id}:${r.location_id}`} className={cn('transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/50', status === 'zero' && 'opacity-60')}>
+                  <tr
+                    key={`${r.product_id}:${r.location_id}`}
+                    className={cn('transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/50', status === 'zero' && 'opacity-60')}
+                  >
                     <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">{r.products?.name ?? '—'}</td>
                     <td className="px-4 py-3 font-mono text-xs text-gray-500 dark:text-gray-400">{r.products?.sku ?? '—'}</td>
                     <td className="px-4 py-3 text-gray-500 dark:text-gray-400">{r.locations?.warehouses?.name ?? '—'}</td>
@@ -186,12 +348,15 @@ export function InventoryClient({ rows, warehouses }: Props) {
                       </span>
                     </td>
                     <td className="px-4 py-3 font-mono text-xs text-gray-400 dark:text-gray-600">
-                      {r.products?.min_quantity ?? 0}
+                      {min > 0 ? min : '—'}
                     </td>
                     <td className="px-4 py-3">
                       <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-medium', STATUS_BADGE[status])}>
                         {statusLabel[status]}
                       </span>
+                    </td>
+                    <td className="px-4 py-3 font-mono text-xs text-gray-500 dark:text-gray-400">
+                      {approxValue != null ? `${approxValue} лв.` : '—'}
                     </td>
                   </tr>
                 )
