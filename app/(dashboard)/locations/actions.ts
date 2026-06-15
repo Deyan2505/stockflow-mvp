@@ -38,6 +38,7 @@ export async function createLocation(input: LocationInput) {
     if (error.code === '23505') throw new Error(`Код "${input.code}" вече съществува в този склад`)
     throw new Error(error.message)
   }
+  revalidatePath('/')
   revalidatePath('/locations')
   revalidatePath('/movements')
 }
@@ -53,6 +54,7 @@ export async function updateLocation(id: string, input: LocationInput) {
     if (error.code === '23505') throw new Error(`Код "${input.code}" вече съществува в този склад`)
     throw new Error(error.message)
   }
+  revalidatePath('/')
   revalidatePath('/locations')
   revalidatePath('/movements')
 }
@@ -79,6 +81,7 @@ export async function archiveLocation(id: string) {
     .eq('id', id)
     .eq('company_id', CO)
   if (error) throw new Error(error.message)
+  revalidatePath('/')
   revalidatePath('/locations')
 }
 
@@ -90,5 +93,6 @@ export async function restoreLocation(id: string) {
     .eq('id', id)
     .eq('company_id', CO)
   if (error) throw new Error(error.message)
+  revalidatePath('/')
   revalidatePath('/locations')
 }

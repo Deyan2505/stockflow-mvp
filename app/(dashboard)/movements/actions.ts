@@ -42,6 +42,7 @@ export type Movement = {
 
 export async function submitMovement(input: MovementInput): Promise<void> {
   await recordMovement(input)
+  revalidatePath('/')
   revalidatePath('/movements')
   revalidatePath('/inventory')
 }

@@ -41,6 +41,7 @@ export async function createProduct(input: ProductInput) {
     if (error.code === '23505') throw new Error(`SKU "${input.sku}" вече съществува`)
     throw new Error(error.message)
   }
+  revalidatePath('/')
   revalidatePath('/products')
   revalidatePath('/movements')
 }
@@ -56,6 +57,7 @@ export async function updateProduct(id: string, input: ProductInput) {
     if (error.code === '23505') throw new Error(`SKU "${input.sku}" вече съществува`)
     throw new Error(error.message)
   }
+  revalidatePath('/')
   revalidatePath('/products')
 }
 
@@ -67,6 +69,7 @@ export async function archiveProduct(id: string) {
     .eq('id', id)
     .eq('company_id', CO)
   if (error) throw new Error(error.message)
+  revalidatePath('/')
   revalidatePath('/products')
 }
 
@@ -78,5 +81,6 @@ export async function restoreProduct(id: string) {
     .eq('id', id)
     .eq('company_id', CO)
   if (error) throw new Error(error.message)
+  revalidatePath('/')
   revalidatePath('/products')
 }

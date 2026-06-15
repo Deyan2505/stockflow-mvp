@@ -26,6 +26,7 @@ export async function createWarehouse(input: WarehouseInput) {
     .from('warehouses')
     .insert({ ...input, company_id: CO, status: 'active' })
   if (error) throw new Error(error.message)
+  revalidatePath('/')
   revalidatePath('/warehouses')
 }
 
@@ -37,6 +38,7 @@ export async function updateWarehouse(id: string, input: WarehouseInput) {
     .eq('id', id)
     .eq('company_id', CO)
   if (error) throw new Error(error.message)
+  revalidatePath('/')
   revalidatePath('/warehouses')
 }
 
@@ -61,6 +63,7 @@ export async function archiveWarehouse(id: string) {
     .eq('id', id)
     .eq('company_id', CO)
   if (error) throw new Error(error.message)
+  revalidatePath('/')
   revalidatePath('/warehouses')
 }
 
@@ -72,5 +75,6 @@ export async function restoreWarehouse(id: string) {
     .eq('id', id)
     .eq('company_id', CO)
   if (error) throw new Error(error.message)
+  revalidatePath('/')
   revalidatePath('/warehouses')
 }
