@@ -43,7 +43,7 @@ export default async function ReportsPage() {
       .eq('status', 'active'),
   ])
 
-  if (errProducts ?? errBalances ?? errWarehouses) {
+  if (errProducts ?? errBalances ?? errWarehouses ?? errDeliveries ?? errSuppliers) {
     return (
       <div className="rounded-xl border border-red-100 bg-red-50 p-6 text-sm text-red-700 dark:border-red-900/30 dark:bg-red-900/10 dark:text-red-400">
         Грешка при зареждане на справките
