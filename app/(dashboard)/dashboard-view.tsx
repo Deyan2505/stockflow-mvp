@@ -1,16 +1,43 @@
 'use client'
 
-import { Package, Warehouse, MapPin, ArrowRightLeft, AlertTriangle, type LucideIcon } from 'lucide-react'
-import { useT } from '@/lib/i18n'
+import Link from 'next/link'
+import {
+  Package, Warehouse, MapPin, Layers, AlertTriangle,
+  Truck, ClipboardList, BarChart3, ArrowRightLeft, type LucideIcon,
+} from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { useT, type T } from '@/lib/i18n'
 
-// ─── Types (mirrored from page.tsx) ──────────────────────────────────────────
+// ── Types ──────────────────────────────────────────────────────────────────────
 
-export type Stats    = { products: number; warehouses: number; locations: number; movements: number }
+export type Stats = {
+  products: number; warehouses: number; locations: number; movements: number
+  inventoryPositions: number; belowMin: number
+  expectedDeliveries: number; partialDeliveries: number
+  inventoryValue: number; inventoryValueKnown: boolean
+}
+
 export type DayData  = { label: string; labelEn?: string; date: string; in: number; out: number }
-export type TopProd  = { name: string; sku: string | null; unit: string; qty: number; maxQty: number }
-export type LowItem  = { id: string; name: string; sku: string | null; unit: string; current: number; min: number }
 
-// ─── Stat Card ────────────────────────────────────────────────────────────────
+export type LowItem  = {
+  id: string; name: string; sku: string | null; unit: string
+  current: number; min: number; shortage: number
+}
+
+export type RecentMovement = {
+  id: string; created_at: string; movement_type: string
+  quantity: number; reference_type: string | null
+  product_name: string; product_unit: string
+  location_display: string | null
+}
+
+export type ActiveDelivery = {
+  id: string; delivery_number: string; supplier_name: string
+  status: string; expected_date: string | null
+  total_expected: number; total_received: number; remaining: number
+}
+
+// ── StatCard (row 1) ───────────────────────────────────────────────────────────
 
 type CardColor = 'indigo' | 'violet' | 'sky' | 'emerald'
 
@@ -59,7 +86,35 @@ function StatCard({ label, value, sub, icon: Icon, color }: {
   )
 }
 
-// ─── SVG Bar Chart ────────────────────────────────────────────────────────────
+// ── SecondaryKpiCard (row 2) ───────────────────────────────────────────────────
+
+function SecondaryKpiCard({ label, displayValue, sub, icon: Icon, alert }: {
+  label: string; displayValue: string; sub: string; icon: LucideIcon; alert?: boolean
+}) {
+  return (
+    <div className={cn(
+      'rounded-xl border p-4',
+      alert
+        ? 'border-amber-200 bg-amber-50 dark:border-amber-900/40 dark:bg-amber-950/20'
+        : 'border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-900'
+    )}>
+      <div className="flex items-center justify-between">
+        <p className={cn('text-xs font-medium', alert ? 'text-amber-700 dark:text-amber-400' : 'text-gray-500 dark:text-gray-400')}>
+          {label}
+        </p>
+        <Icon className={cn('h-4 w-4', alert ? 'text-amber-500 dark:text-amber-400' : 'text-gray-300 dark:text-gray-600')} strokeWidth={1.8} />
+      </div>
+      <p className={cn('mt-2 text-2xl font-bold tabular-nums', alert ? 'text-amber-800 dark:text-amber-300' : 'text-gray-900 dark:text-white')}>
+        {displayValue}
+      </p>
+      <p className={cn('mt-0.5 text-xs', alert ? 'text-amber-600/70 dark:text-amber-500/60' : 'text-gray-400 dark:text-gray-600')}>
+        {sub}
+      </p>
+    </div>
+  )
+}
+
+// ── SVG Bar Chart ──────────────────────────────────────────────────────────────
 
 function MovementsChart({ data, inLabel, outLabel, noDataLabel, title, subtitle, lang }: {
   data: DayData[]
@@ -120,55 +175,186 @@ function MovementsChart({ data, inLabel, outLabel, noDataLabel, title, subtitle,
   )
 }
 
-// ─── Top Products ─────────────────────────────────────────────────────────────
+// ── Quick Actions ──────────────────────────────────────────────────────────────
 
-const RANK_COLORS = ['#6366f1', '#818cf8', '#a5b4fc', '#94a3b8', '#cbd5e1']
-
-function TopProductsList({ products, title, subtitle, noStockLabel }: {
-  products: TopProd[]; title: string; subtitle: string; noStockLabel: string
-}) {
+function QuickActionsCard({ d }: { d: T['dashboard'] }) {
+  const items = [
+    { href: '/products',   icon: Package,       label: d.qaProducts,   cls: 'bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400' },
+    { href: '/movements',  icon: ArrowRightLeft, label: d.qaMovements,  cls: 'bg-violet-50 text-violet-600 dark:bg-violet-950/40 dark:text-violet-400' },
+    { href: '/deliveries', icon: ClipboardList,  label: d.qaDeliveries, cls: 'bg-sky-50 text-sky-600 dark:bg-sky-950/40 dark:text-sky-400' },
+    { href: '/suppliers',  icon: Truck,          label: d.qaSuppliers,  cls: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400' },
+  ]
   return (
     <div className="rounded-2xl border border-gray-100 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
-      <p className="text-sm font-semibold text-gray-800 dark:text-white">{title}</p>
-      <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500">{subtitle}</p>
-      {products.length === 0 ? (
-        <div className="mt-4 flex items-center justify-center rounded-xl bg-gray-50 dark:bg-gray-800/50" style={{ height: 180 }}>
-          <p className="text-sm text-gray-300 dark:text-gray-600">{noStockLabel}</p>
+      <p className="mb-4 text-sm font-semibold text-gray-800 dark:text-white">{d.qaTitle}</p>
+      <div className="grid grid-cols-2 gap-2.5">
+        {items.map(item => (
+          <Link key={item.href} href={item.href}
+            className="flex items-center gap-2.5 rounded-xl border border-gray-100 p-3 text-sm font-medium text-gray-700 transition-colors hover:border-gray-200 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-gray-800">
+            <div className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg', item.cls)}>
+              <item.icon className="h-4 w-4" strokeWidth={1.8} />
+            </div>
+            {item.label}
+          </Link>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ── Recent Movements ───────────────────────────────────────────────────────────
+
+const MOVE_BADGE: Record<string, { bg: string; text: string; label?: string }> = {
+  IN:       { bg: 'bg-blue-50 dark:bg-blue-950/40',   text: 'text-blue-700 dark:text-blue-300' },
+  OUT:      { bg: 'bg-rose-50 dark:bg-rose-950/40',   text: 'text-rose-700 dark:text-rose-300' },
+  TRANSFER: { bg: 'bg-violet-50 dark:bg-violet-950/40', text: 'text-violet-700 dark:text-violet-300' },
+}
+
+function fmtDate(iso: string): string {
+  const d = new Date(iso)
+  return d.toLocaleDateString('bg-BG', { day: '2-digit', month: '2-digit' })
+}
+
+function RecentMovementsPanel({ movements, d }: { movements: RecentMovement[]; d: T['dashboard'] }) {
+  const thCls = 'pb-2.5 pr-3 text-left text-[11px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500 whitespace-nowrap'
+  return (
+    <div className="rounded-2xl border border-gray-100 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
+      <div className="mb-4 flex items-center gap-2.5">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-indigo-50 dark:bg-indigo-950/40">
+          <ArrowRightLeft className="h-4 w-4 text-indigo-600 dark:text-indigo-400" strokeWidth={1.8} />
+        </div>
+        <p className="text-sm font-semibold text-gray-800 dark:text-white">{d.recentTitle}</p>
+      </div>
+      {movements.length === 0 ? (
+        <div className="flex items-center justify-center rounded-xl bg-gray-50 py-10 dark:bg-gray-800/50">
+          <p className="text-sm text-gray-300 dark:text-gray-600">{d.noRecent}</p>
         </div>
       ) : (
-        <div className="mt-5 space-y-4">
-          {products.map((p, i) => (
-            <div key={i}>
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex min-w-0 items-center gap-2">
-                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gray-100 text-[10px] font-bold text-gray-500 dark:bg-gray-800 dark:text-gray-400">
-                    {i + 1}
-                  </span>
-                  <span className="truncate text-sm font-medium text-gray-800 dark:text-gray-200">{p.name}</span>
-                  {p.sku && <span className="shrink-0 text-[10px] text-gray-400">{p.sku}</span>}
-                </div>
-                <span className="shrink-0 text-sm font-bold tabular-nums text-gray-700 dark:text-gray-300">
-                  {p.qty.toLocaleString()}{' '}
-                  <span className="text-xs font-normal text-gray-400">{p.unit}</span>
-                </span>
-              </div>
-              <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
-                <div className="h-full rounded-full transition-all duration-700"
-                  style={{ width: `${(p.qty / p.maxQty) * 100}%`, background: RANK_COLORS[i] ?? '#e2e8f0' }} />
-              </div>
-            </div>
-          ))}
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-100 dark:border-gray-800">
+                <th className={thCls}>{d.chartTitle.slice(0, 4)}</th>
+                <th className={thCls}>Тип</th>
+                <th className={thCls + ' w-full'}>Продукт</th>
+                <th className={cn(thCls, 'text-right')}>Кол.</th>
+                <th className={thCls}>{d.colLocation}</th>
+                <th className={thCls}>Ref.</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
+              {movements.map(m => {
+                const badge = MOVE_BADGE[m.movement_type] ?? MOVE_BADGE.IN
+                const typeLabel = m.movement_type === 'IN' ? d.typeIn : m.movement_type === 'OUT' ? d.typeOut : d.typeTransfer
+                const refLabel  = m.reference_type === 'incoming_delivery' ? d.refDelivery : d.refManual
+                return (
+                  <tr key={m.id} className="align-middle">
+                    <td className="py-2 pr-3 text-xs tabular-nums text-gray-400 dark:text-gray-600 whitespace-nowrap">
+                      {fmtDate(m.created_at)}
+                    </td>
+                    <td className="py-2 pr-3">
+                      <span className={cn('rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap', badge.bg, badge.text)}>
+                        {typeLabel}
+                      </span>
+                    </td>
+                    <td className="max-w-0 py-2 pr-3">
+                      <span className="block truncate text-sm text-gray-700 dark:text-gray-300">{m.product_name}</span>
+                    </td>
+                    <td className="py-2 pr-3 text-right text-sm font-semibold tabular-nums text-gray-800 dark:text-gray-200 whitespace-nowrap">
+                      {m.quantity.toLocaleString()}
+                      <span className="ml-1 text-xs font-normal text-gray-400">{m.product_unit}</span>
+                    </td>
+                    <td className="py-2 pr-3 text-xs font-mono text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                      {m.location_display ?? '—'}
+                    </td>
+                    <td className="py-2 text-[10px] text-gray-400 dark:text-gray-600 whitespace-nowrap">
+                      {refLabel}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
         </div>
       )}
     </div>
   )
 }
 
-// ─── Low Stock ────────────────────────────────────────────────────────────────
+// ── Active Deliveries ──────────────────────────────────────────────────────────
 
-function LowStockPanel({ items, title, subtitle, minLabel }: {
-  items: LowItem[]; title: string; subtitle: string; minLabel: string
-}) {
+const DEL_STATUS: Record<string, { bg: string; text: string }> = {
+  expected:             { bg: 'bg-blue-50 dark:bg-blue-950/40',   text: 'text-blue-700 dark:text-blue-300' },
+  partially_received:   { bg: 'bg-amber-50 dark:bg-amber-950/30', text: 'text-amber-700 dark:text-amber-300' },
+}
+
+function ActiveDeliveriesPanel({ deliveries, d }: { deliveries: ActiveDelivery[]; d: T['dashboard'] }) {
+  const thCls = 'pb-2.5 text-left text-[11px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500 whitespace-nowrap'
+  return (
+    <div className="rounded-2xl border border-gray-100 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
+      <div className="mb-4 flex items-center gap-2.5">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-sky-50 dark:bg-sky-950/40">
+          <Truck className="h-4 w-4 text-sky-600 dark:text-sky-400" strokeWidth={1.8} />
+        </div>
+        <p className="text-sm font-semibold text-gray-800 dark:text-white">{d.activeDelTitle}</p>
+      </div>
+      {deliveries.length === 0 ? (
+        <div className="flex items-center justify-center rounded-xl bg-gray-50 py-10 dark:bg-gray-800/50">
+          <p className="text-sm text-gray-300 dark:text-gray-600">{d.noDel}</p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-100 dark:border-gray-800">
+                <th className={thCls + ' pr-3'}>{d.colDeliveryNum}</th>
+                <th className={thCls + ' pr-3 w-full'}>{d.colSupplier}</th>
+                <th className={thCls + ' pr-3'}>{d.colStatus}</th>
+                <th className={cn(thCls, 'pr-3 text-right')}>{d.colExpectedQty}</th>
+                <th className={cn(thCls, 'pr-3 text-right')}>{d.colReceived}</th>
+                <th className={cn(thCls, 'text-right')}>{d.colRemaining}</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
+              {deliveries.map(del => {
+                const badge = DEL_STATUS[del.status] ?? DEL_STATUS.expected
+                return (
+                  <tr key={del.id} className="align-middle">
+                    <td className="py-2 pr-3 font-mono text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                      {del.delivery_number}
+                    </td>
+                    <td className="max-w-0 py-2 pr-3">
+                      <span className="block truncate text-xs text-gray-600 dark:text-gray-400">{del.supplier_name}</span>
+                    </td>
+                    <td className="py-2 pr-3">
+                      <span className={cn('rounded-md px-1.5 py-0.5 text-[10px] font-medium whitespace-nowrap', badge.bg, badge.text)}>
+                        {del.status === 'partially_received' ? d.statPartial : d.statExpected}
+                      </span>
+                    </td>
+                    <td className="py-2 pr-3 text-right text-xs tabular-nums text-gray-500 dark:text-gray-400">
+                      {del.total_expected.toLocaleString()}
+                    </td>
+                    <td className="py-2 pr-3 text-right text-xs tabular-nums text-gray-500 dark:text-gray-400">
+                      {del.total_received.toLocaleString()}
+                    </td>
+                    <td className="py-2 text-right text-xs font-semibold tabular-nums text-sky-700 dark:text-sky-400">
+                      {del.remaining.toLocaleString()}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Low Stock Panel ────────────────────────────────────────────────────────────
+
+function LowStockPanel({ items, d }: { items: LowItem[]; d: T['dashboard'] }) {
+  const thCls = 'pb-2.5 text-[11px] font-medium uppercase tracking-wide text-amber-700/70 dark:text-amber-500/60 whitespace-nowrap'
   return (
     <div className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50/60 p-5 dark:border-amber-900/40 dark:from-amber-950/25 dark:to-orange-950/10">
       <div className="mb-4 flex items-center gap-2.5">
@@ -176,54 +362,71 @@ function LowStockPanel({ items, title, subtitle, minLabel }: {
           <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" strokeWidth={2} />
         </div>
         <div>
-          <p className="text-sm font-semibold text-amber-900 dark:text-amber-300">{title}</p>
-          <p className="text-xs text-amber-600/70 dark:text-amber-500/60">{subtitle}</p>
+          <p className="text-sm font-semibold text-amber-900 dark:text-amber-300">{d.lowStock}</p>
+          <p className="text-xs text-amber-600/70 dark:text-amber-500/60">{d.lowStockSub(items.length)}</p>
         </div>
       </div>
-      <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
-        {items.map((item, i) => {
-          const pct = item.min > 0 ? Math.min((item.current / item.min) * 100, 100) : 0
-          return (
-            <div key={i} className="rounded-xl border border-amber-100 bg-white/80 p-3.5 dark:border-amber-900/30 dark:bg-gray-900/70">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-amber-200/60 dark:border-amber-900/40">
+              <th className={thCls + ' pr-4 text-left w-full'}>Продукт</th>
+              <th className={cn(thCls, 'pr-4 text-right')}>{d.colAvailable}</th>
+              <th className={cn(thCls, 'pr-4 text-right')}>{d.minLabel.replace('.', '')}.</th>
+              <th className={cn(thCls, 'pr-4 text-right')}>{d.colShortage}</th>
+              <th className={cn(thCls, 'text-left')}>Ед.</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-amber-100/60 dark:divide-amber-900/20">
+            {items.map((item, i) => (
+              <tr key={i} className="align-middle">
+                <td className="py-2 pr-4">
                   <p className="truncate text-sm font-medium text-gray-800 dark:text-gray-200">{item.name}</p>
-                  {item.sku && <p className="mt-0.5 text-[10px] text-gray-400">{item.sku}</p>}
-                </div>
-                <span className="shrink-0 rounded-md px-2 py-0.5 text-xs font-bold tabular-nums"
-                  style={{ background: 'rgb(255 241 242)', color: '#e11d48' }}>
-                  {item.current} {item.unit}
-                </span>
-              </div>
-              <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-amber-100 dark:bg-amber-900/30">
-                <div className="h-full rounded-full" style={{ width: `${pct}%`, background: '#fb7185' }} />
-              </div>
-              <p className="mt-1.5 text-[10px] text-gray-400 dark:text-gray-600">{minLabel} {item.min} {item.unit}</p>
-            </div>
-          )
-        })}
+                  {item.sku && <p className="text-[10px] text-gray-400 dark:text-gray-600">{item.sku}</p>}
+                </td>
+                <td className="py-2 pr-4 text-right text-sm font-semibold tabular-nums text-amber-700 dark:text-amber-400">
+                  {item.current.toLocaleString()}
+                </td>
+                <td className="py-2 pr-4 text-right text-xs tabular-nums text-gray-500 dark:text-gray-400">
+                  {item.min.toLocaleString()}
+                </td>
+                <td className="py-2 pr-4 text-right text-sm font-bold tabular-nums text-red-600 dark:text-red-400">
+                  -{item.shortage.toLocaleString()}
+                </td>
+                <td className="py-2 text-xs text-gray-500 dark:text-gray-400">
+                  {item.unit}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   )
 }
 
-// ─── Main View ────────────────────────────────────────────────────────────────
+// ── Main View ──────────────────────────────────────────────────────────────────
 
-export function DashboardView({ stats, chartData, topProducts, lowStock }: {
-  stats: Stats; chartData: DayData[]; topProducts: TopProd[]; lowStock: LowItem[]
+export function DashboardView({ stats, chartData, lowStock, recentMovements, activeDeliveries }: {
+  stats: Stats; chartData: DayData[]; lowStock: LowItem[]
+  recentMovements: RecentMovement[]; activeDeliveries: ActiveDelivery[]
 }) {
   const { t, lang } = useT()
   const d = t.dashboard
   const noData = stats.products === 0 && stats.warehouses === 0
 
+  const valueDisplay = stats.inventoryValueKnown
+    ? stats.inventoryValue.toLocaleString('bg-BG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    : '—'
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div>
         <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">{d.title}</h1>
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{d.subtitle}</p>
       </div>
 
-      {/* KPI Cards */}
+      {/* Row 1 — main KPI cards */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard label={d.statProducts} value={stats.products} icon={Package} color="indigo"
           sub={stats.products > 0 ? d.subActiveProducts : d.subNoProducts} />
@@ -231,26 +434,66 @@ export function DashboardView({ stats, chartData, topProducts, lowStock }: {
           sub={stats.warehouses > 0 ? d.subActiveWarehouses : d.subNoWarehouses} />
         <StatCard label={d.statLocations} value={stats.locations} icon={MapPin} color="sky"
           sub={stats.locations > 0 ? d.subActiveLocations : d.subNoLocations} />
-        <StatCard label={d.statMovements} value={stats.movements} icon={ArrowRightLeft} color="emerald"
-          sub={stats.movements > 0 ? d.subTotalMovements : d.subNoMovements} />
+        <StatCard label={d.statPositions} value={stats.inventoryPositions} icon={Layers} color="emerald"
+          sub={stats.inventoryPositions > 0 ? d.subPositions : d.subNoProducts} />
       </div>
 
-      {/* Chart + Top Products */}
+      {/* Row 2 — secondary KPI cards */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <SecondaryKpiCard
+          label={d.statBelowMin}
+          displayValue={stats.belowMin > 0 ? stats.belowMin.toString() : '0'}
+          sub={stats.belowMin > 0 ? `${stats.belowMin} ${d.subBelowMin}` : d.subNoBelowMin}
+          icon={AlertTriangle}
+          alert={stats.belowMin > 0}
+        />
+        <SecondaryKpiCard
+          label={d.statExpected}
+          displayValue={stats.expectedDeliveries > 0 ? stats.expectedDeliveries.toString() : '0'}
+          sub={stats.expectedDeliveries > 0 ? d.subExpected : d.subNoExpected}
+          icon={ClipboardList}
+          alert={false}
+        />
+        <SecondaryKpiCard
+          label={d.statPartial}
+          displayValue={stats.partialDeliveries > 0 ? stats.partialDeliveries.toString() : '0'}
+          sub={stats.partialDeliveries > 0 ? d.subPartial : d.subNoPartial}
+          icon={Truck}
+          alert={false}
+        />
+        <SecondaryKpiCard
+          label={d.statValue}
+          displayValue={valueDisplay}
+          sub={stats.inventoryValueKnown ? d.subValue : d.subNoValue}
+          icon={BarChart3}
+          alert={false}
+        />
+      </div>
+
+      {/* Row 3 — Chart + Quick Actions */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
         <div className="lg:col-span-3">
           <MovementsChart data={chartData} inLabel={d.in} outLabel={d.out}
             noDataLabel={d.noMovements} title={d.chartTitle} subtitle={d.chartSub} lang={lang} />
         </div>
         <div className="lg:col-span-2">
-          <TopProductsList products={topProducts} title={d.topTitle} subtitle={d.topSub}
-            noStockLabel={d.noStock} />
+          <QuickActionsCard d={d} />
         </div>
       </div>
 
-      {/* Low Stock */}
+      {/* Row 4 — Recent Movements + Active Deliveries */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
+        <div className="lg:col-span-3">
+          <RecentMovementsPanel movements={recentMovements} d={d} />
+        </div>
+        <div className="lg:col-span-2">
+          <ActiveDeliveriesPanel deliveries={activeDeliveries} d={d} />
+        </div>
+      </div>
+
+      {/* Row 5 — Low Stock */}
       {lowStock.length > 0 && (
-        <LowStockPanel items={lowStock} title={d.lowStock}
-          subtitle={d.lowStockSub(lowStock.length)} minLabel={d.minLabel} />
+        <LowStockPanel items={lowStock} d={d} />
       )}
 
       {/* Onboarding */}
