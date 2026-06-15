@@ -3,27 +3,25 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
-  LayoutDashboard,
-  Package,
-  Warehouse,
-  MapPin,
-  ArrowRightLeft,
-  BarChart3,
+  LayoutDashboard, Package, Warehouse, MapPin, ArrowRightLeft, BarChart3,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ThemeToggle } from './theme-toggle'
-
-const navigation = [
-  { name: 'Начало', href: '/', icon: LayoutDashboard },
-  { name: 'Продукти', href: '/products', icon: Package },
-  { name: 'Складове', href: '/warehouses', icon: Warehouse },
-  { name: 'Локации', href: '/locations', icon: MapPin },
-  { name: 'Движения', href: '/movements', icon: ArrowRightLeft },
-  { name: 'Наличност', href: '/inventory', icon: BarChart3 },
-]
+import { LanguageToggle } from './language-toggle'
+import { useT } from '@/lib/i18n'
 
 export function Sidebar() {
   const pathname = usePathname()
+  const { t } = useT()
+
+  const navigation = [
+    { name: t.nav.home,       href: '/',           icon: LayoutDashboard },
+    { name: t.nav.products,   href: '/products',   icon: Package         },
+    { name: t.nav.warehouses, href: '/warehouses', icon: Warehouse       },
+    { name: t.nav.locations,  href: '/locations',  icon: MapPin          },
+    { name: t.nav.movements,  href: '/movements',  icon: ArrowRightLeft  },
+    { name: t.nav.inventory,  href: '/inventory',  icon: BarChart3       },
+  ]
 
   return (
     <aside className="flex h-screen w-56 flex-col border-r border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-900">
@@ -54,9 +52,7 @@ export function Sidebar() {
                   <item.icon
                     className={cn(
                       'h-4 w-4 shrink-0',
-                      isActive
-                        ? 'text-blue-600 dark:text-blue-400'
-                        : 'text-gray-400 dark:text-gray-500'
+                      isActive ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500'
                     )}
                   />
                   {item.name}
@@ -67,10 +63,13 @@ export function Sidebar() {
         </ul>
       </nav>
 
-      {/* Footer с theme toggle */}
+      {/* Footer */}
       <div className="flex items-center justify-between border-t border-gray-100 px-4 py-3 dark:border-gray-800">
-        <p className="text-xs text-gray-400 dark:text-gray-600">MVP · v0.1</p>
-        <ThemeToggle />
+        <p className="text-xs text-gray-400 dark:text-gray-600">{t.nav.version}</p>
+        <div className="flex items-center gap-2">
+          <LanguageToggle />
+          <ThemeToggle />
+        </div>
       </div>
     </aside>
   )

@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react'
 import { X } from 'lucide-react'
 import { type Warehouse, type WarehouseInput, createWarehouse, updateWarehouse } from './actions'
+import { useT } from '@/lib/i18n'
 
 type Props = {
   warehouse: Warehouse | null
@@ -12,6 +13,9 @@ type Props = {
 const empty: WarehouseInput = { name: '', address: null }
 
 export function WarehouseModal({ warehouse, onClose }: Props) {
+  const { t } = useT()
+  const w = t.warehouses
+
   const [form, setForm] = useState<WarehouseInput>(
     warehouse ? { name: warehouse.name, address: warehouse.address } : empty
   )
@@ -20,7 +24,7 @@ export function WarehouseModal({ warehouse, onClose }: Props) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!form.name.trim()) { setError('Наименованието е задължително'); return }
+    if (!form.name.trim()) { setError(w.errRequired); return }
     setError(null)
 
     startTransition(async () => {
@@ -32,7 +36,7 @@ export function WarehouseModal({ warehouse, onClose }: Props) {
         }
         onClose()
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Грешка, опитай отново')
+        setError(err instanceof Error ? err.message : w.errGeneric)
       }
     })
   }
@@ -45,7 +49,7 @@ export function WarehouseModal({ warehouse, onClose }: Props) {
       <div className="w-full max-w-md rounded-xl bg-white shadow-xl dark:bg-gray-900">
         <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4 dark:border-gray-800">
           <h2 className="font-semibold text-gray-900 dark:text-white">
-            {warehouse ? 'Редактиране на склад' : 'Нов склад'}
+            {warehouse ? w.modalEditTitle : w.modalNewTitle}
           </h2>
           <button
             onClick={onClose}
@@ -59,26 +63,26 @@ export function WarehouseModal({ warehouse, onClose }: Props) {
           <div className="space-y-4">
             <div>
               <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
-                Наименование <span className="text-red-500">*</span>
+                {w.fName} <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                 className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                placeholder="Централен склад"
+                placeholder={w.namePlaceholder}
               />
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
-                Адрес
+                {w.fAddress}
               </label>
               <input
                 type="text"
                 value={form.address ?? ''}
                 onChange={(e) => setForm((f) => ({ ...f, address: e.target.value || null }))}
                 className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                placeholder="ул. Примерна 1, София"
+                placeholder={w.addressPlaceholder}
               />
             </div>
           </div>
@@ -91,14 +95,14 @@ export function WarehouseModal({ warehouse, onClose }: Props) {
               onClick={onClose}
               className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
             >
-              Отказ
+              {w.cancel}
             </button>
             <button
               type="submit"
               disabled={isPending}
               className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
             >
-              {isPending ? 'Запазване…' : warehouse ? 'Запази' : 'Създай склад'}
+              {isPending ? w.saving : warehouse ? w.save : w.create}
             </button>
           </div>
         </form>

@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import { X } from 'lucide-react'
 import { type Location, type LocationInput, createLocation, updateLocation } from './actions'
 import type { Warehouse } from '../warehouses/actions'
+import { useT } from '@/lib/i18n'
 
 type Props = {
   location: Location | null
@@ -34,6 +35,9 @@ function toInput(l: Location): LocationInput {
 }
 
 export function LocationModal({ location, warehouses, onClose }: Props) {
+  const { t } = useT()
+  const l = t.locations
+
   const [form, setForm] = useState<LocationInput>(
     location ? toInput(location) : emptyForm(warehouses)
   )
@@ -45,8 +49,8 @@ export function LocationModal({ location, warehouses, onClose }: Props) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!form.code.trim()) { setError('Кодът е задължителен'); return }
-    if (!form.warehouse_id) { setError('Складът е задължителен'); return }
+    if (!form.code.trim()) { setError(l.errCode); return }
+    if (!form.warehouse_id) { setError(l.errWarehouse); return }
     setError(null)
 
     startTransition(async () => {
@@ -58,13 +62,20 @@ export function LocationModal({ location, warehouses, onClose }: Props) {
         }
         onClose()
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Грешка, опитай отново')
+        setError(err instanceof Error ? err.message : l.errGeneric)
       }
     })
   }
 
   const inputClass =
     'w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white'
+
+  const subFields: [string, keyof LocationInput, string][] = [
+    [l.fZone, 'zone', 'A'],
+    [l.fRow, 'row', '01'],
+    [l.fShelf, 'shelf', '02'],
+    [l.fBin, 'bin', ''],
+  ]
 
   return (
     <div
@@ -74,7 +85,7 @@ export function LocationModal({ location, warehouses, onClose }: Props) {
       <div className="w-full max-w-md rounded-xl bg-white shadow-xl dark:bg-gray-900">
         <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4 dark:border-gray-800">
           <h2 className="font-semibold text-gray-900 dark:text-white">
-            {location ? 'Редактиране на локация' : 'Нова локация'}
+            {location ? l.modalEditTitle : l.modalNewTitle}
           </h2>
           <button
             onClick={onClose}
@@ -86,15 +97,12 @@ export function LocationModal({ location, warehouses, onClose }: Props) {
 
         <form onSubmit={handleSubmit} className="p-6">
           <div className="space-y-4">
-            {/* Warehouse */}
             <div>
               <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
-                Склад <span className="text-red-500">*</span>
+                {l.fWarehouse} <span className="text-red-500">*</span>
               </label>
               {warehouses.length === 0 ? (
-                <p className="text-xs text-red-500">
-                  Няма активни складове. Първо създай склад.
-                </p>
+                <p className="text-xs text-red-500">{l.noWarehouses}</p>
               ) : (
                 <select
                   value={form.warehouse_id}
@@ -102,18 +110,15 @@ export function LocationModal({ location, warehouses, onClose }: Props) {
                   className={inputClass}
                 >
                   {warehouses.map((w) => (
-                    <option key={w.id} value={w.id}>
-                      {w.name}
-                    </option>
+                    <option key={w.id} value={w.id}>{w.name}</option>
                   ))}
                 </select>
               )}
             </div>
 
-            {/* Code */}
             <div>
               <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
-                Код <span className="text-red-500">*</span>
+                {l.fCode} <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -122,21 +127,11 @@ export function LocationModal({ location, warehouses, onClose }: Props) {
                 placeholder="A-01-02"
                 className={inputClass}
               />
-              <p className="mt-1 text-xs text-gray-400 dark:text-gray-600">
-                Уникален код в склада, напр. A-01-02
-              </p>
+              <p className="mt-1 text-xs text-gray-400 dark:text-gray-600">{l.codeHint}</p>
             </div>
 
-            {/* Zone / Row / Shelf / Bin */}
             <div className="grid grid-cols-2 gap-3">
-              {(
-                [
-                  ['Зона', 'zone', 'A'],
-                  ['Ред', 'row', '01'],
-                  ['Рафт', 'shelf', '02'],
-                  ['Кошче', 'bin', ''],
-                ] as [string, keyof LocationInput, string][]
-              ).map(([label, key, placeholder]) => (
+              {subFields.map(([label, key, placeholder]) => (
                 <div key={key}>
                   <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
                     {label}
@@ -161,14 +156,14 @@ export function LocationModal({ location, warehouses, onClose }: Props) {
               onClick={onClose}
               className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
             >
-              Отказ
+              {l.cancel}
             </button>
             <button
               type="submit"
               disabled={isPending || warehouses.length === 0}
               className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
             >
-              {isPending ? 'Запазване…' : location ? 'Запази' : 'Създай локация'}
+              {isPending ? l.saving : location ? l.save : l.create}
             </button>
           </div>
         </form>

@@ -1,0 +1,253 @@
+'use client'
+
+import { createContext, useContext, useEffect, useState } from 'react'
+
+export type Lang = 'bg' | 'en'
+
+// ─── Translation dictionary ───────────────────────────────────────────────────
+
+const dict = {
+  bg: {
+    nav: {
+      home: 'Начало', products: 'Продукти', warehouses: 'Складове',
+      locations: 'Локации', movements: 'Движения', inventory: 'Наличност',
+      version: 'MVP · v0.1',
+    },
+    dashboard: {
+      title: 'Начало', subtitle: 'Преглед на наличността',
+      statProducts: 'Продукти', statWarehouses: 'Складове',
+      statLocations: 'Локации', statMovements: 'Движения',
+      subActiveProducts: 'активни продукта', subActiveWarehouses: 'активни склада',
+      subActiveLocations: 'активни локации', subTotalMovements: 'записани общо',
+      subNoProducts: 'Добави стока', subNoWarehouses: 'Добави склад',
+      subNoLocations: 'Добави локация', subNoMovements: 'Все още няма',
+      chartTitle: 'Движения', chartSub: 'последните 7 дни',
+      in: 'Вход', out: 'Изход', noMovements: 'Все още няма движения',
+      topTitle: 'Топ продукти', topSub: 'по налично количество', noStock: 'Няма наличност',
+      lowStock: 'Ниска наличност',
+      lowStockSub: (n: number) => `${n} ${n === 1 ? 'продукт' : 'продукта'} под минималното количество`,
+      minLabel: 'мин.',
+      onboarding: 'Започни като добавиш продукти, складове и локации.',
+      onboardingSub: 'Таблото ще се попълни с данни при записване на движения.',
+    },
+    products: {
+      title: 'Продукти', activeCount: (n: number) => `${n} активни продукта`,
+      newBtn: '+ Нов продукт', searchPlaceholder: 'Търси по наименование, SKU или баркод…',
+      showArchived: 'Покажи архивирани',
+      cols: ['Наименование', 'SKU', 'Категория', 'Ед.мярка', 'Дост. цена', 'Прод. цена', 'Мин. кол.', 'Статус', ''],
+      noResults: 'Няма намерени продукти', noItems: 'Все още няма продукти',
+      addFirst: 'Натисни "Нов продукт" за да добавиш първия',
+      active: 'активен', archived: 'архивиран',
+      edit: 'Редактирай', archive: 'Архивирай', restore: 'Възстанови',
+      modalEditTitle: 'Редактиране на продукт', modalNewTitle: 'Нов продукт',
+      fName: 'Наименование', fSku: 'SKU', fBarcode: 'Баркод', fCategory: 'Категория',
+      fUnit: 'Ед. мярка', fCostPrice: 'Доставна цена', fSalePrice: 'Продажна цена',
+      fMinQty: 'Мин. количество',
+      cancel: 'Отказ', save: 'Запази', create: 'Създай продукт', saving: 'Запазване…',
+      errRequired: 'Наименованието е задължително', errGeneric: 'Грешка, опитай отново',
+    },
+    warehouses: {
+      title: 'Складове', activeCount: (n: number) => `${n} активни склада`,
+      newBtn: '+ Нов склад', searchPlaceholder: 'Търси по наименование или адрес…',
+      showInactive: 'Покажи неактивни',
+      cols: ['Наименование', 'Адрес', 'Статус', ''],
+      noResults: 'Няма намерени складове', noItems: 'Все още няма складове',
+      addFirst: 'Натисни "Нов склад" за да добавиш първия',
+      active: 'активен', inactive: 'неактивен',
+      edit: 'Редактирай', deactivate: 'Деактивирай', restore: 'Възстанови', close: 'Затвори',
+      modalEditTitle: 'Редактиране на склад', modalNewTitle: 'Нов склад',
+      fName: 'Наименование', fAddress: 'Адрес',
+      namePlaceholder: 'Централен склад', addressPlaceholder: 'ул. Примерна 1, София',
+      cancel: 'Отказ', save: 'Запази', create: 'Създай склад', saving: 'Запазване…',
+      errRequired: 'Наименованието е задължително', errGeneric: 'Грешка, опитай отново',
+    },
+    locations: {
+      title: 'Локации', activeCount: (n: number) => `${n} активни локации`,
+      newBtn: '+ Нова локация', searchPlaceholder: 'Търси по код, зона или склад…',
+      allWarehouses: 'Всички складове', showInactive: 'Покажи неактивни',
+      cols: ['Код', 'Склад', 'Зона', 'Ред', 'Рафт', 'Кошче', 'Статус', ''],
+      noResults: 'Няма намерени локации', noItems: 'Все още няма локации',
+      addFirst: 'Първо добави склад, след това създай локации в него',
+      active: 'активна', inactive: 'неактивна',
+      edit: 'Редактирай', deactivate: 'Деактивирай', restore: 'Възстанови', close: 'Затвори',
+      modalEditTitle: 'Редактиране на локация', modalNewTitle: 'Нова локация',
+      fWarehouse: 'Склад', fCode: 'Код', fZone: 'Зона', fRow: 'Ред', fShelf: 'Рафт', fBin: 'Кошче',
+      codeHint: 'Уникален код в склада, напр. A-01-02',
+      noWarehouses: 'Няма активни складове. Първо създай склад.',
+      cancel: 'Отказ', save: 'Запази', create: 'Създай локация', saving: 'Запазване…',
+      errCode: 'Кодът е задължителен', errWarehouse: 'Складът е задължителен',
+      errGeneric: 'Грешка, опитай отново',
+    },
+    movements: {
+      title: 'Движения', subtitle: 'Запиши движения на стока: вход, изход или прехвърляне между локации',
+      tabIn: 'Вход', tabOut: 'Изход', tabTransfer: 'Прехвърляне',
+      fProduct: 'Продукт', fFromLoc: 'От локация', fToLoc: 'До локация',
+      fQty: 'Количество', fNote: 'Забележка', notePlaceholder: 'Незадължителна забележка…',
+      selectProduct: 'Избери продукт…', selectLocation: 'Избери локация…',
+      noActiveProducts: 'Няма активни продукти. Първо създай продукт.',
+      available: 'Налично:',
+      saveBtn: (label: string) => `Запиши ${label}`, saving: 'Записване…',
+      historyTitle: 'История на движенията', records: 'записа',
+      histCols: ['Дата', 'Тип', 'Продукт', 'От', 'До', 'Кол.', 'Забележка'],
+      noMovements: 'Все още няма движения', noMovementsSub: 'Всяко движение се записва тук завинаги',
+      successIn: 'Входът е записан успешно', successOut: 'Изходът е записан успешно',
+      successTransfer: 'Прехвърлянето е записано успешно',
+      typeIn: 'ВХОД', typeOut: 'ИЗХОД', typeTransfer: 'ПРЕХВ.',
+      errProduct: 'Избери продукт', errQty: 'Количеството трябва да е над 0',
+      errFromLoc: 'Избери изходна локация', errToLoc: 'Избери входна локация',
+      errSameLoc: 'Изходната и входната локация трябва да са различни',
+      errGeneric: 'Грешка, опитай отново',
+    },
+    inventory: {
+      title: 'Наличност', subtitle: 'Текущо количество по продукт и локация',
+      cardInStock: 'В наличност', cardBelowMin: 'Под минимум', cardZero: 'Изчерпано',
+      positions: 'позиции',
+      allWarehouses: 'Всички складове', showZero: 'Покажи изчерпани',
+      searchPlaceholder: 'Търси по продукт или SKU…',
+      cols: ['Продукт', 'SKU', 'Склад', 'Локация', 'Ед.мярка', 'Налично', 'Мин.', 'Статус'],
+      noItems: 'Все още няма наличност', noResults: 'Няма намерени позиции',
+      autoUpdate: 'Наличността се обновява автоматично при записване на движения',
+      statusOk: 'В наличност', statusLow: 'Под минимум', statusZero: 'Изчерпано',
+    },
+  },
+
+  en: {
+    nav: {
+      home: 'Home', products: 'Products', warehouses: 'Warehouses',
+      locations: 'Locations', movements: 'Movements', inventory: 'Inventory',
+      version: 'MVP · v0.1',
+    },
+    dashboard: {
+      title: 'Home', subtitle: 'Stock overview',
+      statProducts: 'Products', statWarehouses: 'Warehouses',
+      statLocations: 'Locations', statMovements: 'Movements',
+      subActiveProducts: 'active products', subActiveWarehouses: 'active warehouses',
+      subActiveLocations: 'active locations', subTotalMovements: 'total recorded',
+      subNoProducts: 'Add stock', subNoWarehouses: 'Add warehouse',
+      subNoLocations: 'Add location', subNoMovements: 'None yet',
+      chartTitle: 'Movements', chartSub: 'last 7 days',
+      in: 'In', out: 'Out', noMovements: 'No movements yet',
+      topTitle: 'Top products', topSub: 'by stock quantity', noStock: 'No stock',
+      lowStock: 'Low stock',
+      lowStockSub: (n: number) => `${n} ${n === 1 ? 'product' : 'products'} below minimum`,
+      minLabel: 'min.',
+      onboarding: 'Start by adding products, warehouses and locations.',
+      onboardingSub: 'The dashboard will fill with data when movements are recorded.',
+    },
+    products: {
+      title: 'Products', activeCount: (n: number) => `${n} active products`,
+      newBtn: '+ New product', searchPlaceholder: 'Search by name, SKU or barcode…',
+      showArchived: 'Show archived',
+      cols: ['Name', 'SKU', 'Category', 'Unit', 'Cost price', 'Sale price', 'Min qty', 'Status', ''],
+      noResults: 'No products found', noItems: 'No products yet',
+      addFirst: 'Click "New product" to add the first one',
+      active: 'active', archived: 'archived',
+      edit: 'Edit', archive: 'Archive', restore: 'Restore',
+      modalEditTitle: 'Edit product', modalNewTitle: 'New product',
+      fName: 'Name', fSku: 'SKU', fBarcode: 'Barcode', fCategory: 'Category',
+      fUnit: 'Unit', fCostPrice: 'Cost price', fSalePrice: 'Sale price',
+      fMinQty: 'Min quantity',
+      cancel: 'Cancel', save: 'Save', create: 'Create product', saving: 'Saving…',
+      errRequired: 'Name is required', errGeneric: 'Error, please try again',
+    },
+    warehouses: {
+      title: 'Warehouses', activeCount: (n: number) => `${n} active warehouses`,
+      newBtn: '+ New warehouse', searchPlaceholder: 'Search by name or address…',
+      showInactive: 'Show inactive',
+      cols: ['Name', 'Address', 'Status', ''],
+      noResults: 'No warehouses found', noItems: 'No warehouses yet',
+      addFirst: 'Click "New warehouse" to add the first one',
+      active: 'active', inactive: 'inactive',
+      edit: 'Edit', deactivate: 'Deactivate', restore: 'Restore', close: 'Close',
+      modalEditTitle: 'Edit warehouse', modalNewTitle: 'New warehouse',
+      fName: 'Name', fAddress: 'Address',
+      namePlaceholder: 'Central warehouse', addressPlaceholder: '1 Example St, City',
+      cancel: 'Cancel', save: 'Save', create: 'Create warehouse', saving: 'Saving…',
+      errRequired: 'Name is required', errGeneric: 'Error, please try again',
+    },
+    locations: {
+      title: 'Locations', activeCount: (n: number) => `${n} active locations`,
+      newBtn: '+ New location', searchPlaceholder: 'Search by code, zone or warehouse…',
+      allWarehouses: 'All warehouses', showInactive: 'Show inactive',
+      cols: ['Code', 'Warehouse', 'Zone', 'Row', 'Shelf', 'Bin', 'Status', ''],
+      noResults: 'No locations found', noItems: 'No locations yet',
+      addFirst: 'Add a warehouse first, then create locations inside it',
+      active: 'active', inactive: 'inactive',
+      edit: 'Edit', deactivate: 'Deactivate', restore: 'Restore', close: 'Close',
+      modalEditTitle: 'Edit location', modalNewTitle: 'New location',
+      fWarehouse: 'Warehouse', fCode: 'Code', fZone: 'Zone', fRow: 'Row', fShelf: 'Shelf', fBin: 'Bin',
+      codeHint: 'Unique code within the warehouse, e.g. A-01-02',
+      noWarehouses: 'No active warehouses. Create a warehouse first.',
+      cancel: 'Cancel', save: 'Save', create: 'Create location', saving: 'Saving…',
+      errCode: 'Code is required', errWarehouse: 'Warehouse is required',
+      errGeneric: 'Error, please try again',
+    },
+    movements: {
+      title: 'Movements', subtitle: 'Record stock movements: in, out or transfer between locations',
+      tabIn: 'In', tabOut: 'Out', tabTransfer: 'Transfer',
+      fProduct: 'Product', fFromLoc: 'From location', fToLoc: 'To location',
+      fQty: 'Quantity', fNote: 'Note', notePlaceholder: 'Optional note…',
+      selectProduct: 'Select product…', selectLocation: 'Select location…',
+      noActiveProducts: 'No active products. Create a product first.',
+      available: 'Available:',
+      saveBtn: (label: string) => `Record ${label}`, saving: 'Saving…',
+      historyTitle: 'Movement history', records: 'records',
+      histCols: ['Date', 'Type', 'Product', 'From', 'To', 'Qty', 'Note'],
+      noMovements: 'No movements yet', noMovementsSub: 'Every movement is recorded here permanently',
+      successIn: 'Inbound recorded successfully', successOut: 'Outbound recorded successfully',
+      successTransfer: 'Transfer recorded successfully',
+      typeIn: 'IN', typeOut: 'OUT', typeTransfer: 'TRANS.',
+      errProduct: 'Select a product', errQty: 'Quantity must be greater than 0',
+      errFromLoc: 'Select from location', errToLoc: 'Select to location',
+      errSameLoc: 'From and to locations must be different',
+      errGeneric: 'Error, please try again',
+    },
+    inventory: {
+      title: 'Inventory', subtitle: 'Current quantity by product and location',
+      cardInStock: 'In stock', cardBelowMin: 'Below minimum', cardZero: 'Out of stock',
+      positions: 'items',
+      allWarehouses: 'All warehouses', showZero: 'Show out of stock',
+      searchPlaceholder: 'Search by product or SKU…',
+      cols: ['Product', 'SKU', 'Warehouse', 'Location', 'Unit', 'Qty', 'Min', 'Status'],
+      noItems: 'No stock yet', noResults: 'No items found',
+      autoUpdate: 'Stock is updated automatically when movements are recorded',
+      statusOk: 'In stock', statusLow: 'Below minimum', statusZero: 'Out of stock',
+    },
+  },
+} as const
+
+export type T = typeof dict.bg
+
+// ─── Context ──────────────────────────────────────────────────────────────────
+
+const LangCtx = createContext<{ lang: Lang; t: T; toggle: () => void }>({
+  lang: 'bg',
+  t: dict.bg,
+  toggle: () => {},
+})
+
+export function LanguageProvider({ children }: { children: React.ReactNode }) {
+  const [lang, setLang] = useState<Lang>('bg')
+
+  useEffect(() => {
+    const stored = localStorage.getItem('sf-lang') as Lang | null
+    if (stored === 'en' || stored === 'bg') setLang(stored)
+  }, [])
+
+  const toggle = () =>
+    setLang((l) => {
+      const next = l === 'bg' ? 'en' : 'bg'
+      localStorage.setItem('sf-lang', next)
+      return next
+    })
+
+  return (
+    <LangCtx.Provider value={{ lang, t: dict[lang] as unknown as T, toggle }}>
+      {children}
+    </LangCtx.Provider>
+  )
+}
+
+export function useT() {
+  return useContext(LangCtx)
+}
