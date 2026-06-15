@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
-  LayoutDashboard, Package, Warehouse, MapPin, ArrowRightLeft, BarChart3, Truck,
+  LayoutDashboard, Package, Warehouse, MapPin, ArrowRightLeft, BarChart3, Truck, ClipboardList,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ThemeToggle } from './theme-toggle'
@@ -22,6 +22,7 @@ export function Sidebar() {
     { name: t.nav.movements,  href: '/movements',  icon: ArrowRightLeft  },
     { name: t.nav.inventory,  href: '/inventory',  icon: BarChart3       },
     { name: t.nav.suppliers,  href: '/suppliers',  icon: Truck           },
+    { name: t.nav.deliveries, href: '/deliveries', icon: ClipboardList   },
   ]
 
   return (
