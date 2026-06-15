@@ -5,6 +5,7 @@ import { Search, Download } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useT } from '@/lib/i18n'
 import { exportToCSV, todayStr } from '@/lib/export-csv'
+import { exportToXLSX } from '@/lib/export-xlsx'
 
 type InventoryRow = {
   product_id: string
@@ -180,13 +181,12 @@ export function InventoryClient({ rows, warehouses }: Props) {
 
   const active = hasActiveFilters(filters)
 
-  const handleExport = () => {
-    const headers = ['Продукт', 'SKU', 'Склад', 'Локация', 'Налично количество', 'Единица', 'Минимално количество', 'Статус', 'Приблизителна стойност (лв.)']
-    const rows = filtered.map((r) => {
+  const buildInventoryRows = () =>
+    filtered.map((r) => {
       const min = r.products?.min_quantity ?? 0
       const status = stockStatus(r.quantity_available, min)
       const approxValue = r.products?.cost_price != null
-        ? (Number(r.products.cost_price) * Number(r.quantity_available)).toFixed(2)
+        ? Number((Number(r.products.cost_price) * Number(r.quantity_available)).toFixed(2))
         : ''
       return [
         r.products?.name ?? '',
@@ -200,7 +200,25 @@ export function InventoryClient({ rows, warehouses }: Props) {
         approxValue,
       ]
     })
-    exportToCSV(`stockflow_inventory_${todayStr()}.csv`, headers, rows)
+
+  const handleExport = () => {
+    const headers = ['Продукт', 'SKU', 'Склад', 'Локация', 'Налично количество', 'Единица', 'Минимално количество', 'Статус', 'Приблизителна стойност (лв.)']
+    exportToCSV(`stockflow_inventory_${todayStr()}.csv`, headers, buildInventoryRows())
+  }
+
+  const handleXlsxExport = () => {
+    const columns = [
+      { header: 'Продукт', width: 28 },
+      { header: 'SKU', width: 14 },
+      { header: 'Склад', width: 20 },
+      { header: 'Локация', width: 14 },
+      { header: 'Налично количество', width: 20 },
+      { header: 'Единица', width: 10 },
+      { header: 'Минимално количество', width: 22 },
+      { header: 'Статус', width: 16 },
+      { header: 'Приблизителна стойност (лв.)', width: 26 },
+    ]
+    exportToXLSX(`stockflow_inventory_${todayStr()}.xlsx`, 'Наличност', columns, buildInventoryRows())
   }
 
   const filterSelectClass =
@@ -338,7 +356,7 @@ export function InventoryClient({ rows, warehouses }: Props) {
 
       {/* Table */}
       <div className="rounded-xl border border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-900">
-        <div className="flex items-center justify-end border-b border-gray-100 px-4 py-2 dark:border-gray-800">
+        <div className="flex items-center justify-end gap-2 border-b border-gray-100 px-4 py-2 dark:border-gray-800">
           <button
             onClick={handleExport}
             disabled={filtered.length === 0}
@@ -346,6 +364,14 @@ export function InventoryClient({ rows, warehouses }: Props) {
           >
             <Download className="h-3.5 w-3.5" />
             {inv.exportCsv}
+          </button>
+          <button
+            onClick={handleXlsxExport}
+            disabled={filtered.length === 0}
+            className="flex items-center gap-1.5 rounded-lg border border-green-200 bg-green-50 px-3 py-1.5 text-xs font-medium text-green-700 transition-colors hover:bg-green-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-green-900/40 dark:bg-green-900/20 dark:text-green-400 dark:hover:bg-green-900/30"
+          >
+            <Download className="h-3.5 w-3.5" />
+            {inv.exportXlsx}
           </button>
         </div>
         <table className="w-full text-sm">

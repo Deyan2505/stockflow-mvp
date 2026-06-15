@@ -1,6 +1,5 @@
 function escapeCell(value: string | number | null | undefined): string {
   const str = value == null ? '' : String(value)
-  // wrap in quotes if contains separator, quote, or newline
   if (str.includes(';') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
     return '"' + str.replace(/"/g, '""') + '"'
   }
@@ -14,12 +13,13 @@ export function exportToCSV(
 ): void {
   const sep = ';'
   const lines: string[] = [
+    // sep= directive: tells Excel which separator to use
+    `sep=${sep}`,
     headers.map(escapeCell).join(sep),
     ...rows.map((row) => row.map(escapeCell).join(sep)),
   ]
-  // BOM for Excel UTF-8 auto-detection
-  const bom = '﻿'
-  const blob = new Blob([bom + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' })
+  // Explicit BOM (﻿) ensures Excel opens UTF-8 correctly
+  const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url

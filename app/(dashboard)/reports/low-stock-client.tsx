@@ -5,6 +5,7 @@ import { Search, ChevronDown, ChevronRight, AlertTriangle, Download } from 'luci
 import { cn } from '@/lib/utils'
 import { useT } from '@/lib/i18n'
 import { exportToCSV, todayStr } from '@/lib/export-csv'
+import { exportToXLSX } from '@/lib/export-xlsx'
 
 export type LowStockProduct = {
   id: string
@@ -95,11 +96,10 @@ export function LowStockClient({ items, warehouses }: Props) {
   const filterSelectClass =
     'rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white'
 
-  const handleExport = () => {
-    const headers = ['Продукт', 'SKU', 'Единица', 'Минимално количество', 'Обща наличност', 'Недостиг', 'Приблизителна стойност на недостига (лв.)', 'Брой локации']
-    const rows = filtered.map((item) => {
+  const buildLowStockRows = () =>
+    filtered.map((item) => {
       const shortageValue = item.cost_price != null
-        ? (item.shortage * item.cost_price).toFixed(2)
+        ? Number((item.shortage * item.cost_price).toFixed(2))
         : ''
       return [
         item.name,
@@ -112,7 +112,24 @@ export function LowStockClient({ items, warehouses }: Props) {
         item.locations.length,
       ]
     })
-    exportToCSV(`stockflow_low_stock_${todayStr()}.csv`, headers, rows)
+
+  const handleExport = () => {
+    const headers = ['Продукт', 'SKU', 'Единица', 'Минимално количество', 'Обща наличност', 'Недостиг', 'Приблизителна стойност на недостига (лв.)', 'Брой локации']
+    exportToCSV(`stockflow_low_stock_${todayStr()}.csv`, headers, buildLowStockRows())
+  }
+
+  const handleXlsxExport = () => {
+    const columns = [
+      { header: 'Продукт', width: 28 },
+      { header: 'SKU', width: 14 },
+      { header: 'Единица', width: 10 },
+      { header: 'Минимално количество', width: 22 },
+      { header: 'Обща наличност', width: 18 },
+      { header: 'Недостиг', width: 12 },
+      { header: 'Приблизителна стойност на недостига (лв.)', width: 38 },
+      { header: 'Брой локации', width: 14 },
+    ]
+    exportToXLSX(`stockflow_low_stock_${todayStr()}.xlsx`, 'Под минимум', columns, buildLowStockRows())
   }
 
   return (
@@ -138,14 +155,24 @@ export function LowStockClient({ items, warehouses }: Props) {
               </p>
             </div>
           </div>
-          <button
-            onClick={handleExport}
-            disabled={filtered.length === 0}
-            className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
-          >
-            <Download className="h-3.5 w-3.5" />
-            {r.exportCsv}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleExport}
+              disabled={filtered.length === 0}
+              className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
+            >
+              <Download className="h-3.5 w-3.5" />
+              {r.exportCsv}
+            </button>
+            <button
+              onClick={handleXlsxExport}
+              disabled={filtered.length === 0}
+              className="flex items-center gap-1.5 rounded-lg border border-green-200 bg-green-50 px-3 py-1.5 text-xs font-medium text-green-700 transition-colors hover:bg-green-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-green-900/40 dark:bg-green-900/20 dark:text-green-400 dark:hover:bg-green-900/30"
+            >
+              <Download className="h-3.5 w-3.5" />
+              {r.exportXlsx}
+            </button>
+          </div>
         </div>
 
         {/* Filters */}

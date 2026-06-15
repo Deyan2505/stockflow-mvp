@@ -113,6 +113,7 @@ const dict = {
       clearFilters: 'Изчисти филтрите',
       refDelivery: 'Вх. доставка',
       exportCsv: 'Експорт CSV',
+      exportXlsx: 'Експорт Excel',
     },
     inventory: {
       title: 'Наличност', subtitle: 'Текущо количество по продукт и локация',
@@ -132,6 +133,7 @@ const dict = {
       clearFilters: 'Изчисти филтрите',
       shown: (shown: number, total: number) => `Показани ${shown} от ${total} позиции`,
       exportCsv: 'Експорт CSV',
+      exportXlsx: 'Експорт Excel',
     },
     suppliers: {
       title: 'Доставчици', activeCount: (n: number) => `${n} активни доставчика`,
@@ -277,6 +279,7 @@ const dict = {
       supplierReportTitle: 'Доставчици по активност',
       supColDeliveries: 'Доставки', supColLastDel: 'Последна', supColReceived: 'Получено',
       exportCsv: 'Експорт CSV',
+      exportXlsx: 'Експорт Excel',
     },
   },
 
@@ -386,6 +389,7 @@ const dict = {
       clearFilters: 'Clear filters',
       refDelivery: 'Delivery',
       exportCsv: 'Export CSV',
+      exportXlsx: 'Export Excel',
     },
     inventory: {
       title: 'Inventory', subtitle: 'Current quantity by product and location',
@@ -405,6 +409,7 @@ const dict = {
       clearFilters: 'Clear filters',
       shown: (shown: number, total: number) => `Showing ${shown} of ${total} items`,
       exportCsv: 'Export CSV',
+      exportXlsx: 'Export Excel',
     },
     suppliers: {
       title: 'Suppliers', activeCount: (n: number) => `${n} active suppliers`,
@@ -550,6 +555,7 @@ const dict = {
       supplierReportTitle: 'Supplier activity',
       supColDeliveries: 'Deliveries', supColLastDel: 'Last', supColReceived: 'Received',
       exportCsv: 'Export CSV',
+      exportXlsx: 'Export Excel',
     },
   },
 } as const

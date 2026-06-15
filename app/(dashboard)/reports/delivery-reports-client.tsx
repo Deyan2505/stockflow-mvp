@@ -5,6 +5,7 @@ import { Search, Download } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useT } from '@/lib/i18n'
 import { exportToCSV, csvDate, todayStr } from '@/lib/export-csv'
+import { exportToXLSX } from '@/lib/export-xlsx'
 
 export type DeliveryReport = {
   id: string
@@ -128,23 +129,19 @@ export function DeliveryReportsClient({ deliveries, suppliers }: Props) {
 
   const active = hasActiveFilters(filters)
 
-  const handleExport = () => {
-    const statusMap: Record<string, string> = {
-      draft: r.delStatusDraft,
-      expected: r.delStatusExpected,
-      partially_received: r.delStatusPartial,
-      received: r.delStatusReceived,
-      cancelled: r.delStatusCancelled,
-    }
-    const headers = [
-      'Номер на доставка', 'Доставчик', 'Статус',
-      'Очаквана дата', 'Дата на получаване', 'Брой продукти',
-      'Общо очаквано количество', 'Общо получено количество', 'Оставащо количество',
-    ]
-    const rows = filtered.map((d) => [
+  const deliveryStatusMap: Record<string, string> = {
+    draft: r.delStatusDraft,
+    expected: r.delStatusExpected,
+    partially_received: r.delStatusPartial,
+    received: r.delStatusReceived,
+    cancelled: r.delStatusCancelled,
+  }
+
+  const buildDeliveryRows = () =>
+    filtered.map((d) => [
       d.delivery_number,
       d.supplier_name,
-      statusMap[d.status] ?? d.status,
+      deliveryStatusMap[d.status] ?? d.status,
       csvDate(d.expected_date),
       csvDate(d.received_date),
       d.item_count,
@@ -152,7 +149,29 @@ export function DeliveryReportsClient({ deliveries, suppliers }: Props) {
       d.total_received,
       d.remaining,
     ])
-    exportToCSV(`stockflow_deliveries_${todayStr()}.csv`, headers, rows)
+
+  const handleExport = () => {
+    const headers = [
+      'Номер на доставка', 'Доставчик', 'Статус',
+      'Очаквана дата', 'Дата на получаване', 'Брой продукти',
+      'Общо очаквано количество', 'Общо получено количество', 'Оставащо количество',
+    ]
+    exportToCSV(`stockflow_deliveries_${todayStr()}.csv`, headers, buildDeliveryRows())
+  }
+
+  const handleXlsxExport = () => {
+    const columns = [
+      { header: 'Номер на доставка', width: 20 },
+      { header: 'Доставчик', width: 28 },
+      { header: 'Статус', width: 16 },
+      { header: 'Очаквана дата', width: 16 },
+      { header: 'Дата на получаване', width: 20 },
+      { header: 'Брой продукти', width: 15 },
+      { header: 'Общо очаквано количество', width: 25 },
+      { header: 'Общо получено количество', width: 25 },
+      { header: 'Оставащо количество', width: 22 },
+    ]
+    exportToXLSX(`stockflow_deliveries_${todayStr()}.xlsx`, 'Доставки', columns, buildDeliveryRows())
   }
 
   const statusLabel = (s: string) => {
@@ -195,14 +214,24 @@ export function DeliveryReportsClient({ deliveries, suppliers }: Props) {
             {r.deliveriesSub(deliveries.length)}
           </p>
         </div>
-        <button
-          onClick={handleExport}
-          disabled={filtered.length === 0}
-          className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
-        >
-          <Download className="h-3.5 w-3.5" />
-          {r.exportCsv}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExport}
+            disabled={filtered.length === 0}
+            className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
+          >
+            <Download className="h-3.5 w-3.5" />
+            {r.exportCsv}
+          </button>
+          <button
+            onClick={handleXlsxExport}
+            disabled={filtered.length === 0}
+            className="flex items-center gap-1.5 rounded-lg border border-green-200 bg-green-50 px-3 py-1.5 text-xs font-medium text-green-700 transition-colors hover:bg-green-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-green-900/40 dark:bg-green-900/20 dark:text-green-400 dark:hover:bg-green-900/30"
+          >
+            <Download className="h-3.5 w-3.5" />
+            {r.exportXlsx}
+          </button>
+        </div>
       </div>
 
       {/* Summary cards */}

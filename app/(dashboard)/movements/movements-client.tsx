@@ -8,6 +8,7 @@ import { submitMovement } from './actions'
 import type { ProductOption, LocationOption, BalanceRow, Movement, MovementInput, MovementResult } from './actions'
 import { useT } from '@/lib/i18n'
 import { exportToCSV, csvDateTime, todayStr } from '@/lib/export-csv'
+import { exportToXLSX } from '@/lib/export-xlsx'
 
 type Props = {
   products: ProductOption[]
@@ -196,9 +197,8 @@ export function MovementsClient({ products, locations, movements, balances }: Pr
 
   const active = hasActiveFilters(filters)
 
-  const handleExport = () => {
-    const headers = ['Дата', 'Тип', 'Продукт', 'От локация', 'До локация', 'Количество', 'Единица', 'Забележка', 'Източник']
-    const rows = filteredMovements.map((mv) => {
+  const buildMovementRows = () =>
+    filteredMovements.map((mv) => {
       const product = productMap.get(mv.product_id)
       const fromLoc = mv.from_location_id ? locationMap.get(mv.from_location_id) : null
       const toLoc = mv.to_location_id ? locationMap.get(mv.to_location_id) : null
@@ -215,7 +215,25 @@ export function MovementsClient({ products, locations, movements, balances }: Pr
         refVal,
       ]
     })
-    exportToCSV(`stockflow_movements_${todayStr()}.csv`, headers, rows)
+
+  const handleExport = () => {
+    const headers = ['Дата', 'Тип', 'Продукт', 'От локация', 'До локация', 'Количество', 'Единица', 'Забележка', 'Източник']
+    exportToCSV(`stockflow_movements_${todayStr()}.csv`, headers, buildMovementRows())
+  }
+
+  const handleXlsxExport = () => {
+    const columns = [
+      { header: 'Дата', width: 20 },
+      { header: 'Тип', width: 10 },
+      { header: 'Продукт', width: 28 },
+      { header: 'От локация', width: 22 },
+      { header: 'До локация', width: 22 },
+      { header: 'Количество', width: 13 },
+      { header: 'Единица', width: 10 },
+      { header: 'Забележка', width: 30 },
+      { header: 'Източник', width: 16 },
+    ]
+    exportToXLSX(`stockflow_movements_${todayStr()}.xlsx`, 'Движения', columns, buildMovementRows())
   }
 
   return (
@@ -359,14 +377,24 @@ export function MovementsClient({ products, locations, movements, balances }: Pr
                   {active ? `${filteredMovements.length} / ${movements.length}` : `${movements.length}`} {m.records}
                 </span>
               </h2>
-              <button
-                onClick={handleExport}
-                disabled={filteredMovements.length === 0}
-                className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
-              >
-                <Download className="h-3.5 w-3.5" />
-                {m.exportCsv}
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleExport}
+                  disabled={filteredMovements.length === 0}
+                  className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  {m.exportCsv}
+                </button>
+                <button
+                  onClick={handleXlsxExport}
+                  disabled={filteredMovements.length === 0}
+                  className="flex items-center gap-1.5 rounded-lg border border-green-200 bg-green-50 px-3 py-1.5 text-xs font-medium text-green-700 transition-colors hover:bg-green-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-green-900/40 dark:bg-green-900/20 dark:text-green-400 dark:hover:bg-green-900/30"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  {m.exportXlsx}
+                </button>
+              </div>
             </div>
 
             {/* Filter bar */}
