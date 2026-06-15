@@ -326,8 +326,8 @@ export function MovementsClient({ products, locations, movements, balances }: Pr
                           <td className="px-4 py-3 font-mono text-sm font-medium text-gray-900 dark:text-white">
                             {Number(mv.quantity)}
                           </td>
-                          <td className="max-w-[100px] truncate px-4 py-3 text-xs text-gray-400 dark:text-gray-500">
-                            {mv.note ?? '—'}
+                          <td className="min-w-[160px] px-4 py-3 text-xs text-gray-400 dark:text-gray-500">
+                            <span className="block break-words">{mv.note ?? '—'}</span>
                           </td>
                         </tr>
                       )
