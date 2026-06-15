@@ -24,14 +24,31 @@ type FormState = {
   note: string
 }
 
+type Filters = {
+  type: '' | 'IN' | 'OUT' | 'TRANSFER'
+  productId: string
+  warehouseId: string
+  dateFrom: string
+  dateTo: string
+  referenceType: '' | 'manual' | 'incoming_delivery'
+}
+
 function emptyForm(): FormState {
   return { product_id: '', from_location_id: '', to_location_id: '', quantity: '', note: '' }
+}
+
+function emptyFilters(): Filters {
+  return { type: '', productId: '', warehouseId: '', dateFrom: '', dateTo: '', referenceType: '' }
 }
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleString('en-GB', {
     day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false,
   })
+}
+
+function hasActiveFilters(f: Filters): boolean {
+  return !!(f.type || f.productId || f.warehouseId || f.dateFrom || f.dateTo || f.referenceType)
 }
 
 export function MovementsClient({ products, locations, movements, balances }: Props) {
@@ -44,6 +61,7 @@ export function MovementsClient({ products, locations, movements, balances }: Pr
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+  const [filters, setFilters] = useState<Filters>(emptyFilters())
 
   const tabs: { id: Tab; label: string; btnClass: string }[] = [
     { id: 'IN', label: m.tabIn, btnClass: 'bg-green-600 hover:bg-green-700' },
@@ -71,10 +89,44 @@ export function MovementsClient({ products, locations, movements, balances }: Pr
   const productMap = useMemo(() => new Map(products.map((p) => [p.id, p])), [products])
   const locationMap = useMemo(() => new Map(locations.map((l) => [l.id, l])), [locations])
 
+  // unique warehouses derived from locations — no extra DB query
+  const warehouses = useMemo(() => {
+    const seen = new Map<string, string>()
+    for (const loc of locations) {
+      if (!seen.has(loc.warehouse_id) && loc.warehouses?.name) {
+        seen.set(loc.warehouse_id, loc.warehouses.name)
+      }
+    }
+    return Array.from(seen.entries()).map(([id, name]) => ({ id, name }))
+  }, [locations])
+
   const availableStock = useMemo(() => {
     if (!form.product_id || !form.from_location_id) return null
     return balanceMap.get(`${form.product_id}:${form.from_location_id}`) ?? 0
   }, [form.product_id, form.from_location_id, balanceMap])
+
+  const filteredMovements = useMemo(() => {
+    return movements.filter((mv) => {
+      if (filters.type && mv.movement_type !== filters.type) return false
+      if (filters.productId && mv.product_id !== filters.productId) return false
+      if (filters.warehouseId) {
+        const fromWarehouse = mv.from_location_id ? locationMap.get(mv.from_location_id)?.warehouse_id : undefined
+        const toWarehouse = mv.to_location_id ? locationMap.get(mv.to_location_id)?.warehouse_id : undefined
+        if (fromWarehouse !== filters.warehouseId && toWarehouse !== filters.warehouseId) return false
+      }
+      if (filters.dateFrom && mv.created_at.substring(0, 10) < filters.dateFrom) return false
+      if (filters.dateTo && mv.created_at.substring(0, 10) > filters.dateTo) return false
+      if (filters.referenceType) {
+        if (filters.referenceType === 'manual' && mv.reference_type != null) return false
+        if (filters.referenceType === 'incoming_delivery' && mv.reference_type !== 'incoming_delivery') return false
+      }
+      return true
+    })
+  }, [movements, filters, locationMap])
+
+  const setFilter = <K extends keyof Filters>(k: K, v: Filters[K]) => {
+    setFilters((f) => ({ ...f, [k]: v }))
+  }
 
   const set = (k: keyof FormState, v: string) => {
     setForm((f) => ({ ...f, [k]: v }))
@@ -98,7 +150,6 @@ export function MovementsClient({ products, locations, movements, balances }: Pr
     if ((tab === 'IN' || tab === 'TRANSFER') && !form.to_location_id) { setError(m.errToLoc); return }
     if (tab === 'TRANSFER' && form.from_location_id === form.to_location_id) { setError(m.errSameLoc); return }
 
-    // Client-side stock check — instant, no server round-trip needed
     if ((tab === 'OUT' || tab === 'TRANSFER') && availableStock !== null && qty > availableStock) {
       const unit = productMap.get(form.product_id)?.unit ?? ''
       setError(m.errInsufficientStock(availableStock, unit))
@@ -131,6 +182,17 @@ export function MovementsClient({ products, locations, movements, balances }: Pr
 
   const selectClass =
     'w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white'
+
+  const filterSelectClass =
+    'rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white'
+
+  const refLabel = (mv: Movement): string => {
+    if (!mv.reference_type) return '—'
+    if (mv.reference_type === 'incoming_delivery') return m.refDelivery
+    return mv.reference_type
+  }
+
+  const active = hasActiveFilters(filters)
 
   return (
     <div>
@@ -265,13 +327,104 @@ export function MovementsClient({ products, locations, movements, balances }: Pr
         {/* RIGHT: History */}
         <div className="col-span-2">
           <div className="rounded-xl border border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-900">
+            {/* History header */}
             <div className="border-b border-gray-100 px-4 py-3 dark:border-gray-800">
               <h2 className="text-sm font-medium text-gray-700 dark:text-gray-300">
                 {m.historyTitle}
                 <span className="ml-2 text-xs font-normal text-gray-400 dark:text-gray-500">
-                  {movements.length} {m.records}
+                  {active ? `${filteredMovements.length} / ${movements.length}` : `${movements.length}`} {m.records}
                 </span>
               </h2>
+            </div>
+
+            {/* Filter bar */}
+            <div className="border-b border-gray-100 px-4 py-3 dark:border-gray-800">
+              {/* Row 1: type buttons + clear */}
+              <div className="mb-2 flex items-center gap-2">
+                {(['', 'IN', 'OUT', 'TRANSFER'] as const).map((type) => {
+                  const label = type === '' ? m.filterAllTypes : TYPE_LABEL[type]
+                  const isActive = filters.type === type
+                  const colorClass = type === 'IN'
+                    ? 'border-green-200 bg-green-50 text-green-700 dark:border-green-900/40 dark:bg-green-900/20 dark:text-green-400'
+                    : type === 'OUT'
+                    ? 'border-red-200 bg-red-50 text-red-700 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-400'
+                    : type === 'TRANSFER'
+                    ? 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900/40 dark:bg-blue-900/20 dark:text-blue-400'
+                    : 'border-gray-200 bg-gray-50 text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'
+                  return (
+                    <button
+                      key={type}
+                      onClick={() => setFilter('type', type)}
+                      className={cn(
+                        'rounded-md border px-2.5 py-1 text-xs font-medium transition-colors',
+                        isActive ? colorClass : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400 dark:hover:bg-gray-800'
+                      )}
+                    >
+                      {label}
+                    </button>
+                  )
+                })}
+                {active && (
+                  <button
+                    onClick={() => setFilters(emptyFilters())}
+                    className="ml-auto text-xs text-blue-600 hover:underline dark:text-blue-400"
+                  >
+                    {m.clearFilters}
+                  </button>
+                )}
+              </div>
+
+              {/* Row 2: dropdowns + date inputs */}
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  value={filters.productId}
+                  onChange={(e) => setFilter('productId', e.target.value)}
+                  className={filterSelectClass}
+                >
+                  <option value="">{m.filterProduct}</option>
+                  {products.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+
+                <select
+                  value={filters.warehouseId}
+                  onChange={(e) => setFilter('warehouseId', e.target.value)}
+                  className={filterSelectClass}
+                >
+                  <option value="">{m.filterWarehouse}</option>
+                  {warehouses.map((w) => (
+                    <option key={w.id} value={w.id}>{w.name}</option>
+                  ))}
+                </select>
+
+                <input
+                  type="date"
+                  value={filters.dateFrom}
+                  onChange={(e) => setFilter('dateFrom', e.target.value)}
+                  placeholder={m.filterDateFrom}
+                  title={m.filterDateFrom}
+                  className={filterSelectClass}
+                />
+                <input
+                  type="date"
+                  value={filters.dateTo}
+                  onChange={(e) => setFilter('dateTo', e.target.value)}
+                  placeholder={m.filterDateTo}
+                  title={m.filterDateTo}
+                  className={filterSelectClass}
+                />
+
+                <select
+                  value={filters.referenceType}
+                  onChange={(e) => setFilter('referenceType', e.target.value as Filters['referenceType'])}
+                  className={filterSelectClass}
+                >
+                  <option value="">{m.filterAllRef}</option>
+                  <option value="manual">{m.filterManual}</option>
+                  <option value="incoming_delivery">{m.filterDelivery}</option>
+                </select>
+              </div>
             </div>
 
             <div className="overflow-x-auto">
@@ -293,8 +446,14 @@ export function MovementsClient({ products, locations, movements, balances }: Pr
                         <p className="mt-1 text-xs text-gray-300 dark:text-gray-600">{m.noMovementsSub}</p>
                       </td>
                     </tr>
+                  ) : filteredMovements.length === 0 ? (
+                    <tr>
+                      <td colSpan={m.histCols.length} className="px-4 py-12 text-center">
+                        <p className="text-sm text-gray-400 dark:text-gray-500">{m.noFilteredMovements}</p>
+                      </td>
+                    </tr>
                   ) : (
-                    movements.map((mv) => {
+                    filteredMovements.map((mv) => {
                       const product = productMap.get(mv.product_id)
                       const fromLoc = mv.from_location_id ? locationMap.get(mv.from_location_id) : null
                       const toLoc = mv.to_location_id ? locationMap.get(mv.to_location_id) : null
@@ -326,8 +485,11 @@ export function MovementsClient({ products, locations, movements, balances }: Pr
                           <td className="px-4 py-3 font-mono text-sm font-medium text-gray-900 dark:text-white">
                             {Number(mv.quantity)}
                           </td>
-                          <td className="min-w-[160px] px-4 py-3 text-xs text-gray-400 dark:text-gray-500">
+                          <td className="min-w-[120px] px-4 py-3 text-xs text-gray-400 dark:text-gray-500">
                             <span className="block break-words">{mv.note ?? '—'}</span>
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-400 dark:text-gray-500">
+                            {refLabel(mv)}
                           </td>
                         </tr>
                       )

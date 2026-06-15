@@ -38,6 +38,8 @@ export type Movement = {
   user_id: string | null
   note: string | null
   created_at: string
+  reference_type: string | null
+  reference_id: string | null
 }
 
 export type MovementResult = { success: true } | { success: false; error: string }
