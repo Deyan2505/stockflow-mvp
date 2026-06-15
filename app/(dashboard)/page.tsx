@@ -210,12 +210,14 @@ function StatCard({
 
 // ─── Movements Chart ──────────────────────────────────────────────────────────
 
+const CHART_H = 140 // px — fixed bar area height
+
 function MovementsChart({ data }: { data: DayData[] }) {
   const maxVal = Math.max(...data.flatMap(d => [d.in, d.out]), 1)
   const isEmpty = data.every(d => d.in === 0 && d.out === 0)
 
   return (
-    <div className="flex h-full flex-col rounded-2xl border border-gray-100 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
+    <div className="rounded-2xl border border-gray-100 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
       {/* header */}
       <div className="flex items-start justify-between">
         <div>
@@ -235,37 +237,42 @@ function MovementsChart({ data }: { data: DayData[] }) {
       </div>
 
       {isEmpty ? (
-        <div className="mt-4 flex flex-1 items-center justify-center rounded-xl bg-gray-50 dark:bg-gray-800/40">
+        <div className="mt-4 flex items-center justify-center rounded-xl bg-gray-50 dark:bg-gray-800/40"
+          style={{ height: CHART_H + 24 }}>
           <p className="text-sm text-gray-300 dark:text-gray-600">Все още няма движения</p>
         </div>
       ) : (
-        <div className="mt-5 flex flex-1 gap-2">
+        <div className="mt-5 flex gap-2">
           {/* Y axis */}
-          <div className="flex flex-col justify-between pb-5">
+          <div className="flex flex-col justify-between" style={{ height: CHART_H + 20 }}>
             {[maxVal, Math.round(maxVal * 0.5), 0].map((v, i) => (
-              <span key={i} className="text-right text-[9px] tabular-nums text-gray-300 dark:text-gray-700">
+              <span key={i} className="text-right text-[9px] tabular-nums text-gray-300 dark:text-gray-700 leading-none">
                 {v > 0 ? v : ''}
               </span>
             ))}
           </div>
 
-          {/* bars + x labels */}
-          <div className="relative flex flex-1 flex-col">
+          {/* chart area */}
+          <div className="relative flex-1">
             {/* gridlines */}
-            <div className="pointer-events-none absolute inset-0 pb-5 flex flex-col justify-between">
+            <div
+              className="pointer-events-none absolute inset-x-0 top-0 flex flex-col justify-between"
+              style={{ height: CHART_H }}
+            >
               {[0, 1, 2].map(i => (
                 <div key={i} className="h-px w-full bg-gray-100 dark:bg-gray-800" />
               ))}
             </div>
 
-            {/* bar groups */}
-            <div className="flex flex-1 items-end gap-1 pb-5">
+            {/* bars */}
+            <div className="flex items-end gap-1" style={{ height: CHART_H }}>
               {data.map((day, i) => (
-                <div key={i} className="group flex flex-1 items-end justify-center gap-0.5">
+                <div key={i} className="group flex flex-1 items-end justify-center gap-[2px]"
+                  style={{ height: CHART_H }}>
                   <div
                     className="flex-1 rounded-t-[3px] bg-indigo-500 transition-all duration-500 group-hover:brightness-110"
                     style={{
-                      height: day.in > 0 ? `${(day.in / maxVal) * 100}%` : '3px',
+                      height: day.in > 0 ? `${(day.in / maxVal) * 100}%` : 3,
                       opacity: day.in > 0 ? 1 : 0.12,
                     }}
                     title={`Вход: ${day.in}`}
@@ -273,7 +280,7 @@ function MovementsChart({ data }: { data: DayData[] }) {
                   <div
                     className="flex-1 rounded-t-[3px] bg-rose-400 transition-all duration-500 group-hover:brightness-110"
                     style={{
-                      height: day.out > 0 ? `${(day.out / maxVal) * 100}%` : '3px',
+                      height: day.out > 0 ? `${(day.out / maxVal) * 100}%` : 3,
                       opacity: day.out > 0 ? 1 : 0.12,
                     }}
                     title={`Изход: ${day.out}`}
@@ -283,7 +290,7 @@ function MovementsChart({ data }: { data: DayData[] }) {
             </div>
 
             {/* x labels */}
-            <div className="flex gap-1">
+            <div className="mt-1.5 flex gap-1">
               {data.map((day, i) => (
                 <div key={i} className="flex-1 text-center">
                   <span className="text-[10px] font-medium text-gray-400 dark:text-gray-600">{day.label}</span>
@@ -309,14 +316,15 @@ const RANK_BARS = [
 
 function TopProductsList({ products }: { products: TopProduct[] }) {
   return (
-    <div className="flex h-full flex-col rounded-2xl border border-gray-100 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
+    <div className="rounded-2xl border border-gray-100 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
       <div>
         <p className="text-sm font-semibold text-gray-800 dark:text-white">Топ продукти</p>
         <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500">по налично количество</p>
       </div>
 
       {products.length === 0 ? (
-        <div className="mt-4 flex flex-1 items-center justify-center rounded-xl bg-gray-50 dark:bg-gray-800/40">
+        <div className="mt-4 flex items-center justify-center rounded-xl bg-gray-50 dark:bg-gray-800/40"
+          style={{ height: CHART_H + 24 }}>
           <p className="text-sm text-gray-300 dark:text-gray-600">Няма наличност</p>
         </div>
       ) : (
@@ -459,16 +467,14 @@ export default async function DashboardPage() {
       </div>
 
       {/* Chart + Top Products */}
-      {!isEmpty && (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-5" style={{ minHeight: '16rem' }}>
-          <div className="lg:col-span-3">
-            <MovementsChart data={chartData} />
-          </div>
-          <div className="lg:col-span-2">
-            <TopProductsList products={topProducts} />
-          </div>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
+        <div className="lg:col-span-3">
+          <MovementsChart data={chartData} />
         </div>
-      )}
+        <div className="lg:col-span-2">
+          <TopProductsList products={topProducts} />
+        </div>
+      </div>
 
       {/* Low Stock Alerts */}
       {lowStock.length > 0 && <LowStockPanel items={lowStock} />}
