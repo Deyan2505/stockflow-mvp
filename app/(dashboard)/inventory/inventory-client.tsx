@@ -150,11 +150,26 @@ export function InventoryClient({ rows, warehouses }: Props) {
 
   // Summary cards always based on all rows
   const totalWithStock = rows.filter((r) => r.quantity_available > 0).length
-  const belowMin = rows.filter((r) => {
-    const min = r.products?.min_quantity ?? 0
-    return min > 0 && r.quantity_available > 0 && r.quantity_available < min
-  }).length
   const zeroStock = rows.filter((r) => r.quantity_available <= 0).length
+
+  // belowMin at product level: sum all locations per product, compare to min_quantity
+  const belowMin = useMemo(() => {
+    const byProduct = new Map<string, { total: number; min: number }>()
+    for (const r of rows) {
+      const min = r.products?.min_quantity ?? 0
+      const existing = byProduct.get(r.product_id)
+      if (existing) {
+        existing.total += Number(r.quantity_available)
+      } else {
+        byProduct.set(r.product_id, { total: Number(r.quantity_available), min })
+      }
+    }
+    let count = 0
+    byProduct.forEach(({ total, min }) => {
+      if (min > 0 && total < min) count++
+    })
+    return count
+  }, [rows])
 
   const statusLabel: Record<StockStatus, string> = {
     ok: inv.statusOk,
