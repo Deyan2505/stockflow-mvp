@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { createAdminClient } from '@/lib/supabase/admin'
 import { LowStockClient, type LowStockProduct } from './low-stock-client'
+import { DeliveryReportsClient, type DeliveryReport } from './delivery-reports-client'
 
 const CO = process.env.DEMO_COMPANY_ID!
 
@@ -12,6 +13,8 @@ export default async function ReportsPage() {
     { data: products, error: errProducts },
     { data: balances, error: errBalances },
     { data: warehouses, error: errWarehouses },
+    { data: deliveries, error: errDeliveries },
+    { data: suppliers, error: errSuppliers },
   ] = await Promise.all([
     sb
       .from('products')
@@ -28,17 +31,28 @@ export default async function ReportsPage() {
       .select('id, name')
       .eq('company_id', CO)
       .eq('status', 'active'),
+    sb
+      .from('incoming_deliveries')
+      .select('id, delivery_number, status, expected_date, received_date, supplier_id, suppliers(name), incoming_delivery_items(expected_quantity, received_quantity)')
+      .eq('company_id', CO)
+      .order('created_at', { ascending: false }),
+    sb
+      .from('suppliers')
+      .select('id, name')
+      .eq('company_id', CO)
+      .eq('status', 'active'),
   ])
 
   if (errProducts ?? errBalances ?? errWarehouses) {
     return (
       <div className="rounded-xl border border-red-100 bg-red-50 p-6 text-sm text-red-700 dark:border-red-900/30 dark:bg-red-900/10 dark:text-red-400">
-        Грешка при зареждане на справката
+        Грешка при зареждане на справките
       </div>
     )
   }
 
-  // Build product-level totals and location breakdown
+  // ── Low Stock ────────────────────────────────────────────────────────────────
+
   type BalLoc = {
     location_id: string
     quantity: number
@@ -70,14 +84,10 @@ export default async function ReportsPage() {
   }
 
   const lowStock: LowStockProduct[] = (products ?? [])
-    .filter((p) => {
-      const total = stockByProduct.get(p.id) ?? 0
-      return total < Number(p.min_quantity)
-    })
+    .filter((p) => (stockByProduct.get(p.id) ?? 0) < Number(p.min_quantity))
     .map((p) => {
       const total = stockByProduct.get(p.id) ?? 0
       const min = Number(p.min_quantity)
-      const shortage = min - total
       const locs = (locationsByProduct.get(p.id) ?? [])
         .filter((l) => l.quantity > 0)
         .sort((a, b) => a.warehouse_name.localeCompare(b.warehouse_name))
@@ -91,16 +101,45 @@ export default async function ReportsPage() {
         min_quantity: min,
         cost_price: p.cost_price != null ? Number(p.cost_price) : null,
         total_available: total,
-        shortage,
+        shortage: min - total,
         locations: locs,
       }
     })
-    .sort((a, b) => b.shortage - a.shortage) // worst shortage first
+    .sort((a, b) => b.shortage - a.shortage)
+
+  // ── Delivery Reports ─────────────────────────────────────────────────────────
+
+  const deliveryReports: DeliveryReport[] = (deliveries ?? []).map((d) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const items: { expected_quantity: number; received_quantity: number }[] = (d as any).incoming_delivery_items ?? []
+    const total_expected = items.reduce((s, i) => s + Number(i.expected_quantity), 0)
+    const total_received = items.reduce((s, i) => s + Number(i.received_quantity), 0)
+    return {
+      id: d.id,
+      delivery_number: d.delivery_number,
+      status: d.status,
+      expected_date: d.expected_date ?? null,
+      received_date: d.received_date ?? null,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      supplier_name: ((d as any).suppliers as { name: string } | null)?.name ?? '—',
+      supplier_id: d.supplier_id,
+      item_count: items.length,
+      total_expected,
+      total_received,
+      remaining: total_expected - total_received,
+    }
+  })
 
   return (
-    <LowStockClient
-      items={lowStock}
-      warehouses={(warehouses ?? []).map((w) => ({ id: w.id, name: w.name }))}
-    />
+    <div className="space-y-8">
+      <LowStockClient
+        items={lowStock}
+        warehouses={(warehouses ?? []).map((w) => ({ id: w.id, name: w.name }))}
+      />
+      <DeliveryReportsClient
+        deliveries={deliveryReports}
+        suppliers={(suppliers ?? []).map((s) => ({ id: s.id, name: s.name }))}
+      />
+    </div>
   )
 }
