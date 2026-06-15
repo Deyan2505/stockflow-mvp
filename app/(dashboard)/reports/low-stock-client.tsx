@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Search, ChevronDown, ChevronRight, AlertTriangle } from 'lucide-react'
+import { Search, ChevronDown, ChevronRight, AlertTriangle, Download } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useT } from '@/lib/i18n'
+import { exportToCSV, todayStr } from '@/lib/export-csv'
 
 export type LowStockProduct = {
   id: string
@@ -94,6 +95,26 @@ export function LowStockClient({ items, warehouses }: Props) {
   const filterSelectClass =
     'rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white'
 
+  const handleExport = () => {
+    const headers = ['Продукт', 'SKU', 'Единица', 'Минимално количество', 'Обща наличност', 'Недостиг', 'Приблизителна стойност на недостига (лв.)', 'Брой локации']
+    const rows = filtered.map((item) => {
+      const shortageValue = item.cost_price != null
+        ? (item.shortage * item.cost_price).toFixed(2)
+        : ''
+      return [
+        item.name,
+        item.sku ?? '',
+        item.unit,
+        item.min_quantity,
+        item.total_available,
+        item.shortage,
+        shortageValue,
+        item.locations.length,
+      ]
+    })
+    exportToCSV(`stockflow_low_stock_${todayStr()}.csv`, headers, rows)
+  }
+
   return (
     <div>
       {/* Header */}
@@ -105,16 +126,26 @@ export function LowStockClient({ items, warehouses }: Props) {
       {/* Low Stock section */}
       <div className="rounded-xl border border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-900">
         {/* Section header */}
-        <div className="flex items-center gap-3 border-b border-gray-100 px-5 py-4 dark:border-gray-800">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-900/30">
-            <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" strokeWidth={2} />
+        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4 dark:border-gray-800">
+          <div className="flex items-center gap-3">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-900/30">
+              <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" strokeWidth={2} />
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold text-gray-800 dark:text-white">{r.lowStockTitle}</h2>
+              <p className="text-xs text-gray-400 dark:text-gray-500">
+                {items.length > 0 ? r.lowStockSub(items.length) : r.noLowStock}
+              </p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-sm font-semibold text-gray-800 dark:text-white">{r.lowStockTitle}</h2>
-            <p className="text-xs text-gray-400 dark:text-gray-500">
-              {items.length > 0 ? r.lowStockSub(items.length) : r.noLowStock}
-            </p>
-          </div>
+          <button
+            onClick={handleExport}
+            disabled={filtered.length === 0}
+            className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
+          >
+            <Download className="h-3.5 w-3.5" />
+            {r.exportCsv}
+          </button>
         </div>
 
         {/* Filters */}

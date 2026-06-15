@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Search } from 'lucide-react'
+import { Search, Download } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useT } from '@/lib/i18n'
+import { exportToCSV, todayStr } from '@/lib/export-csv'
 
 type InventoryRow = {
   product_id: string
@@ -179,6 +180,29 @@ export function InventoryClient({ rows, warehouses }: Props) {
 
   const active = hasActiveFilters(filters)
 
+  const handleExport = () => {
+    const headers = ['Продукт', 'SKU', 'Склад', 'Локация', 'Налично количество', 'Единица', 'Минимално количество', 'Статус', 'Приблизителна стойност (лв.)']
+    const rows = filtered.map((r) => {
+      const min = r.products?.min_quantity ?? 0
+      const status = stockStatus(r.quantity_available, min)
+      const approxValue = r.products?.cost_price != null
+        ? (Number(r.products.cost_price) * Number(r.quantity_available)).toFixed(2)
+        : ''
+      return [
+        r.products?.name ?? '',
+        r.products?.sku ?? '',
+        r.locations?.warehouses?.name ?? '',
+        r.locations?.code ?? '',
+        Number(r.quantity_available),
+        r.products?.unit ?? '',
+        min > 0 ? min : '',
+        statusLabel[status],
+        approxValue,
+      ]
+    })
+    exportToCSV(`stockflow_inventory_${todayStr()}.csv`, headers, rows)
+  }
+
   const filterSelectClass =
     'rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white'
 
@@ -314,6 +338,16 @@ export function InventoryClient({ rows, warehouses }: Props) {
 
       {/* Table */}
       <div className="rounded-xl border border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-900">
+        <div className="flex items-center justify-end border-b border-gray-100 px-4 py-2 dark:border-gray-800">
+          <button
+            onClick={handleExport}
+            disabled={filtered.length === 0}
+            className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
+          >
+            <Download className="h-3.5 w-3.5" />
+            {inv.exportCsv}
+          </button>
+        </div>
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-100 dark:border-gray-800">
@@ -383,3 +417,4 @@ export function InventoryClient({ rows, warehouses }: Props) {
     </div>
   )
 }
+

@@ -2,10 +2,12 @@
 
 import { useState, useTransition, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
+import { Download } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { submitMovement } from './actions'
 import type { ProductOption, LocationOption, BalanceRow, Movement, MovementInput, MovementResult } from './actions'
 import { useT } from '@/lib/i18n'
+import { exportToCSV, csvDateTime, todayStr } from '@/lib/export-csv'
 
 type Props = {
   products: ProductOption[]
@@ -194,6 +196,28 @@ export function MovementsClient({ products, locations, movements, balances }: Pr
 
   const active = hasActiveFilters(filters)
 
+  const handleExport = () => {
+    const headers = ['Дата', 'Тип', 'Продукт', 'От локация', 'До локация', 'Количество', 'Единица', 'Забележка', 'Източник']
+    const rows = filteredMovements.map((mv) => {
+      const product = productMap.get(mv.product_id)
+      const fromLoc = mv.from_location_id ? locationMap.get(mv.from_location_id) : null
+      const toLoc = mv.to_location_id ? locationMap.get(mv.to_location_id) : null
+      const refVal = !mv.reference_type ? 'Ръчно' : mv.reference_type === 'incoming_delivery' ? 'Вх. доставка' : mv.reference_type
+      return [
+        csvDateTime(mv.created_at),
+        TYPE_LABEL[mv.movement_type] ?? mv.movement_type,
+        product?.name ?? '',
+        fromLoc ? `${fromLoc.warehouses?.name ?? ''} / ${fromLoc.code}` : '',
+        toLoc ? `${toLoc.warehouses?.name ?? ''} / ${toLoc.code}` : '',
+        Number(mv.quantity),
+        product?.unit ?? '',
+        mv.note ?? '',
+        refVal,
+      ]
+    })
+    exportToCSV(`stockflow_movements_${todayStr()}.csv`, headers, rows)
+  }
+
   return (
     <div>
       <div className="mb-6">
@@ -328,13 +352,21 @@ export function MovementsClient({ products, locations, movements, balances }: Pr
         <div className="col-span-2">
           <div className="rounded-xl border border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-900">
             {/* History header */}
-            <div className="border-b border-gray-100 px-4 py-3 dark:border-gray-800">
+            <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3 dark:border-gray-800">
               <h2 className="text-sm font-medium text-gray-700 dark:text-gray-300">
                 {m.historyTitle}
                 <span className="ml-2 text-xs font-normal text-gray-400 dark:text-gray-500">
                   {active ? `${filteredMovements.length} / ${movements.length}` : `${movements.length}`} {m.records}
                 </span>
               </h2>
+              <button
+                onClick={handleExport}
+                disabled={filteredMovements.length === 0}
+                className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
+              >
+                <Download className="h-3.5 w-3.5" />
+                {m.exportCsv}
+              </button>
             </div>
 
             {/* Filter bar */}

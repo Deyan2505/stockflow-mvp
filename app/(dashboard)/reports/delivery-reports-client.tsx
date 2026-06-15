@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Search } from 'lucide-react'
+import { Search, Download } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useT } from '@/lib/i18n'
+import { exportToCSV, csvDate, todayStr } from '@/lib/export-csv'
 
 export type DeliveryReport = {
   id: string
@@ -127,6 +128,33 @@ export function DeliveryReportsClient({ deliveries, suppliers }: Props) {
 
   const active = hasActiveFilters(filters)
 
+  const handleExport = () => {
+    const statusMap: Record<string, string> = {
+      draft: r.delStatusDraft,
+      expected: r.delStatusExpected,
+      partially_received: r.delStatusPartial,
+      received: r.delStatusReceived,
+      cancelled: r.delStatusCancelled,
+    }
+    const headers = [
+      'Номер на доставка', 'Доставчик', 'Статус',
+      'Очаквана дата', 'Дата на получаване', 'Брой продукти',
+      'Общо очаквано количество', 'Общо получено количество', 'Оставащо количество',
+    ]
+    const rows = filtered.map((d) => [
+      d.delivery_number,
+      d.supplier_name,
+      statusMap[d.status] ?? d.status,
+      csvDate(d.expected_date),
+      csvDate(d.received_date),
+      d.item_count,
+      d.total_expected,
+      d.total_received,
+      d.remaining,
+    ])
+    exportToCSV(`stockflow_deliveries_${todayStr()}.csv`, headers, rows)
+  }
+
   const statusLabel = (s: string) => {
     const map: Record<string, string> = {
       draft: r.delStatusDraft,
@@ -160,11 +188,21 @@ export function DeliveryReportsClient({ deliveries, suppliers }: Props) {
   return (
     <div>
       {/* Section header */}
-      <div className="mb-4">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{r.deliveriesTitle}</h2>
-        <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
-          {r.deliveriesSub(deliveries.length)}
-        </p>
+      <div className="mb-4 flex items-start justify-between">
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{r.deliveriesTitle}</h2>
+          <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
+            {r.deliveriesSub(deliveries.length)}
+          </p>
+        </div>
+        <button
+          onClick={handleExport}
+          disabled={filtered.length === 0}
+          className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
+        >
+          <Download className="h-3.5 w-3.5" />
+          {r.exportCsv}
+        </button>
       </div>
 
       {/* Summary cards */}
