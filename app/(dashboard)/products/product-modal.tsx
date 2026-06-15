@@ -7,6 +7,8 @@ import { useT } from '@/lib/i18n'
 
 type Props = { product: Product | null; onClose: () => void }
 
+const UNITS = ['бр.', 'кг.', 'г.', 'л.', 'мл.', 'м.', 'см.', 'кутия', 'кашон', 'пакет', 'бутилка']
+
 const empty: ProductInput = { name: '', sku: null, barcode: null, category: null, unit: 'бр.', min_quantity: 0, cost_price: null, sale_price: null }
 
 function toInput(prod: Product): ProductInput {
@@ -71,7 +73,16 @@ export function ProductModal({ product, onClose }: Props) {
             {field(p.fSku, 'sku')}
             {field(p.fBarcode, 'barcode')}
             {field(p.fCategory, 'category')}
-            {field(p.fUnit, 'unit')}
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">{p.fUnit}</label>
+              <select
+                value={form.unit}
+                onChange={(e) => set('unit', e.target.value as never)}
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+              >
+                {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
+              </select>
+            </div>
             {field(p.fCostPrice, 'cost_price', { type: 'number', step: '0.01', min: '0' })}
             {field(p.fSalePrice, 'sale_price', { type: 'number', step: '0.01', min: '0' })}
             {field(p.fMinQty, 'min_quantity', { type: 'number', min: '0' })}

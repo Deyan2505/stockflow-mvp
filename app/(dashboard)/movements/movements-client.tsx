@@ -216,11 +216,18 @@ export function MovementsClient({ products, locations, movements, balances }: Pr
                 <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
                   {m.fQty} <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="number" min="0.001" step="any"
-                  value={form.quantity} onChange={(e) => set('quantity', e.target.value)}
-                  placeholder="0" className={selectClass}
-                />
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number" min="0.001" step="any"
+                    value={form.quantity} onChange={(e) => set('quantity', e.target.value)}
+                    placeholder="0" className={selectClass}
+                  />
+                  {form.product_id && (
+                    <span className="shrink-0 rounded-md border border-gray-200 bg-gray-50 px-2.5 py-2 text-sm font-medium text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
+                      {productMap.get(form.product_id)?.unit ?? ''}
+                    </span>
+                  )}
+                </div>
               </div>
 
               {/* Note */}
