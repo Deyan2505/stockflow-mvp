@@ -9,11 +9,9 @@ import { useT } from '@/lib/i18n'
 
 type Props = {
   orders: Order[]
-  products: { id: string; name: string; unit: string }[]
-  locations: { id: string; code: string }[]
 }
 
-export function OrdersClient({ orders, products, locations }: Props) {
+export function OrdersClient({ orders }: Props) {
   const { t } = useT()
   const o = t.orders
 
@@ -25,11 +23,10 @@ export function OrdersClient({ orders, products, locations }: Props) {
   const [isPending, startTransition] = useTransition()
 
   const STATUS_FILTERS = [
-    { value: 'all',              label: o.filterAll       },
-    { value: 'draft',            label: o.statusDraft     },
-    { value: 'confirmed',        label: o.statusConfirmed },
-    { value: 'partially_issued', label: o.statusPartial   },
-    { value: 'cancelled',        label: o.statusCancelled },
+    { value: 'all',       label: o.filterAll       },
+    { value: 'draft',     label: o.statusDraft     },
+    { value: 'open',      label: o.statusOpen      },
+    { value: 'cancelled', label: o.statusCancelled },
   ]
 
   const filtered = useMemo(() => {
@@ -63,18 +60,14 @@ export function OrdersClient({ orders, products, locations }: Props) {
 
   const statusBadge = (status: Order['status']) => {
     const colorMap: Record<string, string> = {
-      draft:            'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
-      confirmed:        'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400',
-      issued:           'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400',
-      partially_issued: 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400',
-      cancelled:        'bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400',
+      draft:     'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
+      open:      'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400',
+      cancelled: 'bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400',
     }
     const labelMap: Record<string, string> = {
-      draft:            o.statusDraft,
-      confirmed:        o.statusConfirmed,
-      issued:           o.statusIssued,
-      partially_issued: o.statusPartial,
-      cancelled:        o.statusCancelled,
+      draft:     o.statusDraft,
+      open:      o.statusOpen,
+      cancelled: o.statusCancelled,
     }
     return (
       <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-medium', colorMap[status] ?? colorMap.draft)}>
@@ -83,7 +76,7 @@ export function OrdersClient({ orders, products, locations }: Props) {
     )
   }
 
-  const canEdit = (status: Order['status']) => status === 'draft' || status === 'confirmed'
+  const canEdit = (status: Order['status']) => status === 'draft' || status === 'open'
 
   return (
     <div>
@@ -182,7 +175,7 @@ export function OrdersClient({ orders, products, locations }: Props) {
                     {item.order_date ?? '—'}
                   </td>
                   <td className="px-4 py-3 text-gray-500 dark:text-gray-400">
-                    {o.items(item.outgoing_order_items?.length ?? 0)}
+                    {item.expected_date ?? '—'}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
@@ -215,8 +208,6 @@ export function OrdersClient({ orders, products, locations }: Props) {
       {modal !== null && (
         <OrderModal
           order={modal === 'new' ? null : modal}
-          products={products}
-          locations={locations}
           onClose={handleModalClose}
         />
       )}
