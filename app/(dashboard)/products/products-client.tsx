@@ -63,7 +63,7 @@ export function ProductsClient({ products }: { products: Product[] }) {
         </label>
       </div>
 
-      <div className="rounded-xl border border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-900">
+      <div className="overflow-x-auto rounded-xl border border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-900">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-100 dark:border-gray-800">
@@ -89,6 +89,7 @@ export function ProductsClient({ products }: { products: Product[] }) {
                 <tr key={item.id} className={cn('transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/50', item.status === 'archived' && 'opacity-50')}>
                   <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">{item.name}</td>
                   <td className="px-4 py-3 font-mono text-xs text-gray-500 dark:text-gray-400">{item.sku ?? '—'}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-gray-400 dark:text-gray-500">{item.barcode ?? '—'}</td>
                   <td className="px-4 py-3 text-gray-500 dark:text-gray-400">{item.category ?? '—'}</td>
                   <td className="px-4 py-3 text-gray-500 dark:text-gray-400">{item.unit}</td>
                   <td className="px-4 py-3 text-gray-500 dark:text-gray-400">{item.cost_price != null ? item.cost_price.toFixed(2) : '—'}</td>

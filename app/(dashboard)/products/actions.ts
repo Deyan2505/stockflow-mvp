@@ -38,7 +38,10 @@ export async function createProduct(input: ProductInput) {
     .from('products')
     .insert({ ...input, company_id: CO, status: 'active' })
   if (error) {
-    if (error.code === '23505') throw new Error(`SKU "${input.sku}" вече съществува`)
+    if (error.code === '23505') {
+      if (error.message.includes('barcode')) throw new Error(`Баркодът вече е зает от друг продукт`)
+      throw new Error(`SKU "${input.sku}" вече съществува`)
+    }
     throw new Error(error.message)
   }
   revalidatePath('/')
@@ -54,7 +57,10 @@ export async function updateProduct(id: string, input: ProductInput) {
     .eq('id', id)
     .eq('company_id', CO)
   if (error) {
-    if (error.code === '23505') throw new Error(`SKU "${input.sku}" вече съществува`)
+    if (error.code === '23505') {
+      if (error.message.includes('barcode')) throw new Error(`Баркодът вече е зает от друг продукт`)
+      throw new Error(`SKU "${input.sku}" вече съществува`)
+    }
     throw new Error(error.message)
   }
   revalidatePath('/')
