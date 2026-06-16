@@ -2,22 +2,25 @@
 
 import { useState, useTransition, useMemo } from 'react'
 import { Search } from 'lucide-react'
-import { type Order, type OrderResult, cancelOrder } from './actions'
+import { type Order, type Product, type OrderResult, cancelOrder } from './actions'
 import { OrderModal } from './order-modal'
+import { OrderDetailModal } from './order-detail-modal'
 import { cn } from '@/lib/utils'
 import { useT } from '@/lib/i18n'
 
 type Props = {
   orders: Order[]
+  products: Product[]
 }
 
-export function OrdersClient({ orders }: Props) {
+export function OrdersClient({ orders, products }: Props) {
   const { t } = useT()
   const o = t.orders
 
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [modal, setModal] = useState<Order | null | 'new'>(null)
+  const [detailOrder, setDetailOrder] = useState<Order | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
@@ -179,6 +182,12 @@ export function OrdersClient({ orders }: Props) {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => setDetailOrder(item)}
+                        className="text-xs text-gray-500 hover:underline dark:text-gray-400"
+                      >
+                        {o.detail}
+                      </button>
                       {canEdit(item.status) && (
                         <button
                           onClick={() => setModal(item)}
@@ -209,6 +218,19 @@ export function OrdersClient({ orders }: Props) {
         <OrderModal
           order={modal === 'new' ? null : modal}
           onClose={handleModalClose}
+        />
+      )}
+
+      {detailOrder !== null && (
+        <OrderDetailModal
+          order={detailOrder}
+          products={products}
+          onClose={() => setDetailOrder(null)}
+          onEditHeader={() => {
+            const ord = detailOrder
+            setDetailOrder(null)
+            setModal(ord)
+          }}
         />
       )}
     </div>
