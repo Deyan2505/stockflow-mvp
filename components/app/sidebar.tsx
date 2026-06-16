@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
-  LayoutDashboard, Package, Warehouse, MapPin, ArrowRightLeft, BarChart3, Truck, ClipboardList, TrendingDown,
+  LayoutDashboard, Package, Warehouse, MapPin, ArrowRightLeft, BarChart3, Truck, ClipboardList, TrendingDown, ScanLine,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ThemeToggle } from './theme-toggle'
@@ -21,6 +21,7 @@ export function Sidebar() {
     { name: t.nav.locations,  href: '/locations',  icon: MapPin          },
     { name: t.nav.movements,  href: '/movements',  icon: ArrowRightLeft  },
     { name: t.nav.inventory,  href: '/inventory',  icon: BarChart3       },
+    { name: t.nav.scan,       href: '/scan',       icon: ScanLine        },
     { name: t.nav.suppliers,  href: '/suppliers',  icon: Truck           },
     { name: t.nav.deliveries, href: '/deliveries', icon: ClipboardList   },
     { name: t.nav.reports,    href: '/reports',    icon: TrendingDown    },
