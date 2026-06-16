@@ -2,9 +2,9 @@
 
 import { useState, useTransition, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { Download } from 'lucide-react'
+import { Download, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { submitMovement } from './actions'
+import { submitMovement, findProductForMovement } from './actions'
 import type { ProductOption, LocationOption, BalanceRow, Movement, MovementInput, MovementResult } from './actions'
 import { useT } from '@/lib/i18n'
 import { exportToCSV, csvDateTime, todayStr } from '@/lib/export-csv'
@@ -64,6 +64,9 @@ export function MovementsClient({ products, locations, movements, balances }: Pr
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+  const [isBarcodeSearching, startBarcodeSearch] = useTransition()
+  const [barcodeInput, setBarcodeInput] = useState('')
+  const [barcodeMsg, setBarcodeMsg] = useState<{ type: 'found' | 'notFound'; text: string } | null>(null)
   const [filters, setFilters] = useState<Filters>(emptyFilters())
 
   const tabs: { id: Tab; label: string; btnClass: string }[] = [
@@ -140,8 +143,24 @@ export function MovementsClient({ products, locations, movements, balances }: Pr
   const handleTabChange = (newTab: Tab) => {
     setTab(newTab)
     setForm(emptyForm())
+    setBarcodeInput('')
+    setBarcodeMsg(null)
     setError(null)
     setSuccess(null)
+  }
+
+  const handleBarcodeSearch = () => {
+    const trimmed = barcodeInput.trim()
+    if (!trimmed) return
+    startBarcodeSearch(async () => {
+      const result = await findProductForMovement(trimmed)
+      if (result) {
+        set('product_id', result.id)
+        setBarcodeMsg({ type: 'found', text: m.barcodeFound(result.name) })
+      } else {
+        setBarcodeMsg({ type: 'notFound', text: m.barcodeNotFound })
+      }
+    })
   }
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -268,6 +287,51 @@ export function MovementsClient({ products, locations, movements, balances }: Pr
             className="mt-4 rounded-xl border border-gray-100 bg-white p-5 dark:border-gray-800 dark:bg-gray-900"
           >
             <div className="space-y-4">
+              {/* Barcode lookup */}
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
+                  {m.fBarcodeLabel}
+                </label>
+                <div className="flex gap-1.5">
+                  <input
+                    type="text"
+                    value={barcodeInput}
+                    onChange={(e) => { setBarcodeInput(e.target.value); setBarcodeMsg(null) }}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleBarcodeSearch() } }}
+                    placeholder={m.fBarcodePlaceholder}
+                    autoComplete="off"
+                    className="min-w-0 flex-1 rounded-lg border border-gray-200 px-3 py-2 font-mono text-sm focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleBarcodeSearch}
+                    disabled={isBarcodeSearching || !barcodeInput.trim()}
+                    className="shrink-0 rounded-lg bg-gray-100 px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-200 disabled:opacity-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                  >
+                    {m.barcodeSearch}
+                  </button>
+                  {barcodeInput && (
+                    <button
+                      type="button"
+                      onClick={() => { setBarcodeInput(''); setBarcodeMsg(null) }}
+                      className="shrink-0 rounded-lg border border-gray-200 px-2 py-2 text-gray-400 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+                {barcodeMsg && (
+                  <p className={cn(
+                    'mt-1 text-xs',
+                    barcodeMsg.type === 'found'
+                      ? 'text-green-600 dark:text-green-400'
+                      : 'text-amber-600 dark:text-amber-500'
+                  )}>
+                    {barcodeMsg.text}
+                  </p>
+                )}
+              </div>
+
               {/* Product */}
               <div>
                 <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">

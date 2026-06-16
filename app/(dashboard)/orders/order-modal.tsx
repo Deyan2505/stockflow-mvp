@@ -2,64 +2,62 @@
 
 import { useState, useTransition } from 'react'
 import { X, Plus, Trash2 } from 'lucide-react'
-import { type Delivery, type DeliveryInput, createDelivery, updateDelivery, findProductForDelivery } from './actions'
+import { type Order, type OrderInput, createOrder, updateOrder, findProductForOrder } from './actions'
 import { useT } from '@/lib/i18n'
 
-type SupplierOption = { id: string; name: string }
 type ProductOption = { id: string; name: string; unit: string }
 type LocationOption = { id: string; code: string }
 
 type Props = {
-  delivery: Delivery | null
-  suppliers: SupplierOption[]
+  order: Order | null
   products: ProductOption[]
   locations: LocationOption[]
   onClose: (successMsg?: string) => void
 }
 
 type HeaderForm = {
-  supplier_id: string
-  delivery_number: string
-  status: 'draft' | 'expected'
-  expected_date: string
+  order_number: string
+  customer_name: string
+  status: 'draft' | 'confirmed'
+  order_date: string
   note: string
 }
 
 type ItemRow = {
   product_id: string
-  expected_quantity: string
+  ordered_quantity: string
   location_id: string
 }
 
-const emptyItem = (): ItemRow => ({ product_id: '', expected_quantity: '', location_id: '' })
+const emptyItem = (): ItemRow => ({ product_id: '', ordered_quantity: '', location_id: '' })
 
-function initHeader(d: Delivery | null): HeaderForm {
-  return d
+function initHeader(o: Order | null): HeaderForm {
+  return o
     ? {
-        supplier_id: d.supplier_id,
-        delivery_number: d.delivery_number,
-        status: d.status as 'draft' | 'expected',
-        expected_date: d.expected_date ?? '',
-        note: d.note ?? '',
+        order_number:  o.order_number,
+        customer_name: o.customer_name ?? '',
+        status:        o.status === 'draft' || o.status === 'confirmed' ? o.status : 'draft',
+        order_date:    o.order_date ?? '',
+        note:          o.note ?? '',
       }
-    : { supplier_id: '', delivery_number: '', status: 'draft', expected_date: '', note: '' }
+    : { order_number: '', customer_name: '', status: 'draft', order_date: '', note: '' }
 }
 
-function initItems(d: Delivery | null): ItemRow[] {
-  if (!d || !d.incoming_delivery_items?.length) return [emptyItem()]
-  return d.incoming_delivery_items.map((i) => ({
-    product_id: i.product_id,
-    expected_quantity: String(i.expected_quantity),
-    location_id: i.location_id ?? '',
+function initItems(o: Order | null): ItemRow[] {
+  if (!o || !o.outgoing_order_items?.length) return [emptyItem()]
+  return o.outgoing_order_items.map((i) => ({
+    product_id:       i.product_id,
+    ordered_quantity: String(i.ordered_quantity),
+    location_id:      i.location_id ?? '',
   }))
 }
 
-export function DeliveryModal({ delivery, suppliers, products, locations, onClose }: Props) {
+export function OrderModal({ order, products, locations, onClose }: Props) {
   const { t } = useT()
-  const d = t.deliveries
+  const o = t.orders
 
-  const [form, setForm] = useState<HeaderForm>(initHeader(delivery))
-  const [items, setItems] = useState<ItemRow[]>(initItems(delivery))
+  const [form, setForm] = useState<HeaderForm>(initHeader(order))
+  const [items, setItems] = useState<ItemRow[]>(initItems(order))
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const [isBarcodeSearching, startBarcodeSearch] = useTransition()
@@ -89,25 +87,23 @@ export function DeliveryModal({ delivery, suppliers, products, locations, onClos
     const trimmed = (barcodeInputs[idx] ?? '').trim()
     if (!trimmed) return
     startBarcodeSearch(async () => {
-      const result = await findProductForDelivery(trimmed)
+      const result = await findProductForOrder(trimmed)
       if (result) {
         setItem(idx, 'product_id', result.id)
-        setBarcodeMsgs((prev) => ({ ...prev, [idx]: { type: 'found', text: d.itemBarcodeFound(result.name) } }))
+        setBarcodeMsgs((prev) => ({ ...prev, [idx]: { type: 'found', text: o.itemBarcodeFound(result.name) } }))
       } else {
-        setBarcodeMsgs((prev) => ({ ...prev, [idx]: { type: 'notFound', text: d.itemBarcodeNotFound } }))
+        setBarcodeMsgs((prev) => ({ ...prev, [idx]: { type: 'notFound', text: o.itemBarcodeNotFound } }))
       }
     })
   }
 
   const validate = (): string | null => {
-    if (!form.supplier_id) return d.errSupplier
-    if (!form.delivery_number.trim()) return d.errNumber
-    if (items.length === 0) return d.errItems
+    if (!form.order_number.trim()) return o.errNumber
+    if (items.length === 0) return o.errItems
     for (const item of items) {
-      if (!item.product_id) return d.errProduct
-      const qty = Number(item.expected_quantity)
-      if (!qty || qty <= 0) return d.errQty
-      if (!item.location_id) return d.errLocation
+      if (!item.product_id) return o.errProduct
+      const qty = Number(item.ordered_quantity)
+      if (!qty || qty <= 0) return o.errQty
     }
     return null
   }
@@ -118,25 +114,25 @@ export function DeliveryModal({ delivery, suppliers, products, locations, onClos
     if (err) { setError(err); return }
     setError(null)
 
-    const input: DeliveryInput = {
-      supplier_id: form.supplier_id,
-      delivery_number: form.delivery_number,
-      status: form.status,
-      expected_date: form.expected_date || null,
-      note: form.note || null,
+    const input: OrderInput = {
+      order_number:  form.order_number,
+      customer_name: form.customer_name || null,
+      status:        form.status,
+      order_date:    form.order_date || null,
+      note:          form.note || null,
       items: items.map((i) => ({
-        product_id: i.product_id,
-        expected_quantity: Number(i.expected_quantity),
-        location_id: i.location_id || null,
+        product_id:       i.product_id,
+        ordered_quantity: Number(i.ordered_quantity),
+        location_id:      i.location_id || null,
       })),
     }
 
     startTransition(async () => {
-      const result = delivery
-        ? await updateDelivery(delivery.id, input)
-        : await createDelivery(input)
+      const result = order
+        ? await updateOrder(order.id, input)
+        : await createOrder(input)
       if (!result.success) { setError(result.error); return }
-      onClose(delivery ? d.successUpdate : d.successCreate)
+      onClose(order ? o.successUpdate : o.successCreate)
     })
   }
 
@@ -157,7 +153,7 @@ export function DeliveryModal({ delivery, suppliers, products, locations, onClos
         {/* Header */}
         <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4 dark:border-gray-800">
           <h2 className="font-semibold text-gray-900 dark:text-white">
-            {delivery ? d.modalEditTitle : d.modalNewTitle}
+            {order ? o.modalEditTitle : o.modalNewTitle}
           </h2>
           <button
             onClick={() => onClose()}
@@ -168,75 +164,63 @@ export function DeliveryModal({ delivery, suppliers, products, locations, onClos
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-1 flex-col overflow-hidden">
-          {/* Scrollable body */}
           <div className="flex-1 overflow-y-auto p-6">
             {/* Header fields */}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className={labelCls}>
-                  {d.fDeliveryNumber} <span className="text-red-500">*</span>
+                  {o.fOrderNumber} <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
-                  value={form.delivery_number}
-                  onChange={(e) => setField('delivery_number', e.target.value)}
+                  value={form.order_number}
+                  onChange={(e) => setField('order_number', e.target.value)}
                   className={inputCls}
-                  placeholder={d.deliveryNumberPlaceholder}
+                  placeholder={o.orderNumberPlaceholder}
                 />
               </div>
 
               <div>
-                <label className={labelCls}>
-                  {d.fSupplier} <span className="text-red-500">*</span>
-                </label>
-                {suppliers.length === 0 ? (
-                  <p className="rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-xs text-red-500">
-                    {d.noSuppliers}
-                  </p>
-                ) : (
-                  <select
-                    value={form.supplier_id}
-                    onChange={(e) => setField('supplier_id', e.target.value)}
-                    className={selectCls}
-                  >
-                    <option value="">—</option>
-                    {suppliers.map((s) => (
-                      <option key={s.id} value={s.id}>{s.name}</option>
-                    ))}
-                  </select>
-                )}
+                <label className={labelCls}>{o.fCustomer}</label>
+                <input
+                  type="text"
+                  value={form.customer_name}
+                  onChange={(e) => setField('customer_name', e.target.value)}
+                  className={inputCls}
+                  placeholder={o.customerPlaceholder}
+                />
               </div>
 
               <div>
-                <label className={labelCls}>{d.fStatus}</label>
+                <label className={labelCls}>{o.fStatus}</label>
                 <select
                   value={form.status}
-                  onChange={(e) => setField('status', e.target.value as 'draft' | 'expected')}
+                  onChange={(e) => setField('status', e.target.value as 'draft' | 'confirmed')}
                   className={selectCls}
                 >
-                  <option value="draft">{d.statusDraft}</option>
-                  <option value="expected">{d.statusExpected}</option>
+                  <option value="draft">{o.statusDraft}</option>
+                  <option value="confirmed">{o.statusConfirmed}</option>
                 </select>
               </div>
 
               <div>
-                <label className={labelCls}>{d.fExpectedDate}</label>
+                <label className={labelCls}>{o.fOrderDate}</label>
                 <input
                   type="date"
-                  value={form.expected_date}
-                  onChange={(e) => setField('expected_date', e.target.value)}
+                  value={form.order_date}
+                  onChange={(e) => setField('order_date', e.target.value)}
                   className={inputCls}
                 />
               </div>
 
               <div className="col-span-2">
-                <label className={labelCls}>{d.fNote}</label>
+                <label className={labelCls}>{o.fNote}</label>
                 <textarea
                   rows={2}
                   value={form.note}
                   onChange={(e) => setField('note', e.target.value)}
                   className={inputCls + ' resize-none'}
-                  placeholder={d.notePlaceholder}
+                  placeholder={o.notePlaceholder}
                 />
               </div>
             </div>
@@ -244,16 +228,16 @@ export function DeliveryModal({ delivery, suppliers, products, locations, onClos
             {/* Items section */}
             <div className="mt-6">
               <h3 className="mb-3 text-sm font-medium text-gray-700 dark:text-gray-300">
-                {d.itemsTitle} <span className="text-red-500">*</span>
+                {o.itemsTitle} <span className="text-red-500">*</span>
               </h3>
 
               <div className="rounded-lg border border-gray-200 dark:border-gray-700">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-gray-200 dark:border-gray-700">
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-400">{d.fProduct}</th>
-                      <th className="w-24 px-3 py-2 text-left text-xs font-medium text-gray-400">{d.fQty}</th>
-                      <th className="w-44 px-3 py-2 text-left text-xs font-medium text-gray-400">{d.fLocation}</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-400">{o.fProduct}</th>
+                      <th className="w-24 px-3 py-2 text-left text-xs font-medium text-gray-400">{o.fQty}</th>
+                      <th className="w-44 px-3 py-2 text-left text-xs font-medium text-gray-400">{o.fLocation}</th>
                       <th className="w-8 px-2 py-2" />
                     </tr>
                   </thead>
@@ -266,7 +250,7 @@ export function DeliveryModal({ delivery, suppliers, products, locations, onClos
                             onChange={(e) => setItem(idx, 'product_id', e.target.value)}
                             className={cellSelectCls}
                           >
-                            <option value="">— {d.selectProduct} —</option>
+                            <option value="">— {o.selectProduct} —</option>
                             {products.map((p) => (
                               <option key={p.id} value={p.id}>{p.name}</option>
                             ))}
@@ -281,8 +265,8 @@ export function DeliveryModal({ delivery, suppliers, products, locations, onClos
                                 setBarcodeMsgs((prev) => { const n = { ...prev }; delete n[idx]; return n })
                               }}
                               onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleBarcodeSearch(idx) } }}
-                              placeholder={d.itemBarcodePlaceholder}
-                              aria-label={d.itemBarcodeLabel}
+                              placeholder={o.itemBarcodePlaceholder}
+                              aria-label={o.itemBarcodeLabel}
                               autoComplete="off"
                               className="min-w-0 flex-1 rounded border border-gray-200 px-2 py-1 font-mono text-xs focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500"
                             />
@@ -292,7 +276,7 @@ export function DeliveryModal({ delivery, suppliers, products, locations, onClos
                               disabled={isBarcodeSearching || !(barcodeInputs[idx] ?? '').trim()}
                               className="shrink-0 rounded border border-gray-200 px-2 py-1 text-xs text-gray-500 hover:bg-gray-50 disabled:opacity-40 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
                             >
-                              {d.itemBarcodeSearch}
+                              {o.itemBarcodeSearch}
                             </button>
                             {(barcodeInputs[idx] ?? '') && (
                               <button
@@ -315,8 +299,8 @@ export function DeliveryModal({ delivery, suppliers, products, locations, onClos
                             type="number"
                             min="0.01"
                             step="0.01"
-                            value={item.expected_quantity}
-                            onChange={(e) => setItem(idx, 'expected_quantity', e.target.value)}
+                            value={item.ordered_quantity}
+                            onChange={(e) => setItem(idx, 'ordered_quantity', e.target.value)}
                             className={cellInputCls}
                             placeholder="0"
                           />
@@ -327,7 +311,7 @@ export function DeliveryModal({ delivery, suppliers, products, locations, onClos
                             onChange={(e) => setItem(idx, 'location_id', e.target.value)}
                             className={cellSelectCls}
                           >
-                            <option value="">— {d.selectLocation} —</option>
+                            <option value="">— {o.selectLocation} —</option>
                             {locations.map((l) => (
                               <option key={l.id} value={l.id}>{l.code}</option>
                             ))}
@@ -355,7 +339,7 @@ export function DeliveryModal({ delivery, suppliers, products, locations, onClos
                     className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
                   >
                     <Plus className="h-3.5 w-3.5" />
-                    {d.addItem}
+                    {o.addItem}
                   </button>
                 </div>
               </div>
@@ -369,21 +353,21 @@ export function DeliveryModal({ delivery, suppliers, products, locations, onClos
             </p>
           )}
 
-          {/* Footer buttons */}
+          {/* Footer */}
           <div className="flex justify-end gap-3 border-t border-gray-100 px-6 py-4 dark:border-gray-800">
             <button
               type="button"
               onClick={() => onClose()}
               className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
             >
-              {d.cancel}
+              {o.cancel}
             </button>
             <button
               type="submit"
-              disabled={isPending || suppliers.length === 0}
+              disabled={isPending}
               className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
             >
-              {isPending ? d.saving : delivery ? d.save : d.create}
+              {isPending ? o.saving : order ? o.save : o.create}
             </button>
           </div>
         </form>

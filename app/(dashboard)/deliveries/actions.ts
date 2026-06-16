@@ -3,8 +3,17 @@
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { recordMovement } from '@/lib/movement-engine'
+import { findProductByBarcode } from '@/lib/barcode-utils'
 
 const CO = process.env.DEMO_COMPANY_ID!
+
+export async function findProductForDelivery(barcode: string): Promise<{ id: string; name: string } | null> {
+  const trimmed = barcode.trim()
+  if (!trimmed) return null
+  const product = await findProductByBarcode(trimmed)
+  if (!product) return null
+  return { id: product.id, name: product.name }
+}
 
 export type DeliveryItemRow = {
   id: string

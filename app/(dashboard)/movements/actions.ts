@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { recordMovement, type MovementInput } from '@/lib/movement-engine'
+import { findProductByBarcode } from '@/lib/barcode-utils'
 
 export type { MovementInput }
 
@@ -43,6 +44,16 @@ export type Movement = {
 }
 
 export type MovementResult = { success: true } | { success: false; error: string }
+
+export type ProductForMovement = { id: string; name: string }
+
+export async function findProductForMovement(barcode: string): Promise<ProductForMovement | null> {
+  const trimmed = barcode.trim()
+  if (!trimmed) return null
+  const product = await findProductByBarcode(trimmed)
+  if (!product) return null
+  return { id: product.id, name: product.name }
+}
 
 export async function submitMovement(input: MovementInput): Promise<MovementResult> {
   try {

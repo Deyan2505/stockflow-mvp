@@ -72,10 +72,13 @@ export async function lookupByBarcode(barcode: string): Promise<LookupResult | n
     .gt('quantity_available', 0)
     .order('quantity_available', { ascending: false })
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const balances: InventoryBalance[] = (balanceData ?? []).map((row: any) => ({
-    warehouse_name: (row.locations?.warehouses?.name ?? '—') as string,
-    location_code: (row.locations?.code ?? '—') as string,
+  type RawBal = {
+    quantity_available: number | string
+    locations: { code: string; warehouses: { name: string } | null } | null
+  }
+  const balances: InventoryBalance[] = ((balanceData ?? []) as unknown as RawBal[]).map((row) => ({
+    warehouse_name: row.locations?.warehouses?.name ?? '—',
+    location_code: row.locations?.code ?? '—',
     quantity_available: Number(row.quantity_available),
     unit: product.unit,
   }))
