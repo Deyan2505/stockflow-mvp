@@ -11,6 +11,7 @@ import {
   addOrderItem,
   updateOrderItem,
   removeOrderItem,
+  findProductForOrder,
 } from './actions'
 import { useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
@@ -53,6 +54,11 @@ export function OrderDetailModal({ order, products, onClose, onEditHeader }: Pro
 
   // Remove
   const [isRemoving, startRemove] = useTransition()
+
+  // Barcode
+  const [barcodeVal, setBarcodeVal]   = useState('')
+  const [barcodeMsg, setBarcodeMsg]   = useState<{ type: 'found' | 'notFound'; text: string } | null>(null)
+  const [isBarcodeSearching, startBarcodeSearch] = useTransition()
 
   const canEdit = order.status !== 'cancelled'
 
@@ -116,6 +122,33 @@ export function OrderDetailModal({ order, products, onClose, onEditHeader }: Pro
     })
   }
 
+  // ── Barcode handlers ─────────────────────────────────────────────────────────
+
+  const handleBarcodeSearch = () => {
+    const trimmed = barcodeVal.trim()
+    if (!trimmed) return
+    setBarcodeMsg(null)
+    startBarcodeSearch(async () => {
+      const result = await findProductForOrder(trimmed)
+      if (!result) {
+        setBarcodeMsg({ type: 'notFound', text: o.itemBarcodeNotFound })
+        return
+      }
+      if (items.some((i) => i.product_id === result.id)) {
+        setBarcodeMsg({ type: 'notFound', text: o.itemErrDuplicate })
+        return
+      }
+      setAddProductId(result.id)
+      setAddError(null)
+      setBarcodeMsg({ type: 'found', text: o.itemBarcodeFound(result.name) })
+    })
+  }
+
+  const clearBarcode = () => {
+    setBarcodeVal('')
+    setBarcodeMsg(null)
+  }
+
   // ── Shared styles ────────────────────────────────────────────────────────────
 
   const inputCls =
@@ -141,7 +174,7 @@ export function OrderDetailModal({ order, products, onClose, onEditHeader }: Pro
                 statusColor[order.status] ?? statusColor.draft,
               )}
             >
-              {o[`status${order.status.charAt(0).toUpperCase()}${order.status.slice(1)}` as keyof typeof o] ?? order.status}
+              {{ draft: o.statusDraft, open: o.statusOpen, cancelled: o.statusCancelled }[order.status] ?? order.status}
             </span>
             {canEdit && (
               <button
@@ -303,6 +336,44 @@ export function OrderDetailModal({ order, products, onClose, onEditHeader }: Pro
               <p className="mb-2 text-xs font-medium text-gray-500 dark:text-gray-400">
                 {o.itemAddTitle}
               </p>
+
+              {/* Barcode row */}
+              <div className="mb-2 flex gap-1">
+                <input
+                  type="text"
+                  value={barcodeVal}
+                  onChange={(e) => { setBarcodeVal(e.target.value); setBarcodeMsg(null) }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleBarcodeSearch() } }}
+                  placeholder={o.itemBarcodePlaceholder}
+                  aria-label={o.itemBarcodeLabel}
+                  autoComplete="off"
+                  className="min-w-0 flex-1 rounded-lg border border-gray-200 px-3 py-2 font-mono text-sm focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500"
+                />
+                <button
+                  type="button"
+                  onClick={handleBarcodeSearch}
+                  disabled={isBarcodeSearching || !barcodeVal.trim()}
+                  className="shrink-0 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-500 hover:bg-gray-50 disabled:opacity-40 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
+                >
+                  {o.itemBarcodeSearch}
+                </button>
+                {barcodeVal && (
+                  <button
+                    type="button"
+                    onClick={clearBarcode}
+                    className="shrink-0 rounded-lg border border-gray-200 px-2.5 py-2 text-gray-400 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+              {barcodeMsg && (
+                <p className={`mb-2 text-xs ${barcodeMsg.type === 'found' ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-500'}`}>
+                  {barcodeMsg.text}
+                </p>
+              )}
+
+              {/* Product + qty + Add row */}
               <div className="flex gap-2">
                 <select
                   value={addProductId}

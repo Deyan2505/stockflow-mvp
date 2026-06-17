@@ -363,6 +363,11 @@ const dict = {
       itemErrNoProduct: 'Избери продукт',
       itemErrQty: 'Въведи валидно положително количество',
       itemErrDuplicate: 'Продуктът вече е добавен в тази поръчка',
+      itemBarcodeLabel: 'Сканирай баркод',
+      itemBarcodePlaceholder: 'Сканирай или въведи баркод',
+      itemBarcodeSearch: 'Намери',
+      itemBarcodeFound: (name: string) => `Намерен: ${name}`,
+      itemBarcodeNotFound: 'Продуктът не е намерен за този баркод',
     },
     scan: {
       title: 'Barcode Lookup',
@@ -739,6 +744,11 @@ const dict = {
       itemErrNoProduct: 'Select a product',
       itemErrQty: 'Enter a valid positive quantity',
       itemErrDuplicate: 'This product is already in the order',
+      itemBarcodeLabel: 'Scan barcode',
+      itemBarcodePlaceholder: 'Scan or enter barcode',
+      itemBarcodeSearch: 'Find',
+      itemBarcodeFound: (name: string) => `Found: ${name}`,
+      itemBarcodeNotFound: 'No product found for this barcode',
     },
     scan: {
       title: 'Barcode Lookup',

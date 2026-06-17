@@ -2,11 +2,13 @@
 
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { findProductByBarcode } from '@/lib/barcode-utils'
 
 const CO = process.env.DEMO_COMPANY_ID!
 
 // v0.6 Step 1: header CRUD — no fulfillment, no stock movements
 // v0.6 Step 2: order items CRUD — no fulfillment, no stock movements, no inventory change
+// v0.6 Step 2B: barcode-assisted product selection — read-only lookup, no stock movement
 
 export type Order = {
   id: string
@@ -120,6 +122,18 @@ export async function cancelOrder(id: string): Promise<OrderResult> {
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : 'Грешка, опитай отново' }
   }
+}
+
+// ─── Barcode Lookup (read-only) ───────────────────────────────────────────────
+// Mirrors findProductForDelivery in deliveries/actions.ts.
+// Never creates stock movements or modifies inventory balances.
+
+export async function findProductForOrder(barcode: string): Promise<{ id: string; name: string } | null> {
+  const trimmed = barcode.trim()
+  if (!trimmed) return null
+  const product = await findProductByBarcode(trimmed)
+  if (!product) return null
+  return { id: product.id, name: product.name }
 }
 
 // ─── Order Items Actions ──────────────────────────────────────────────────────
