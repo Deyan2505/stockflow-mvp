@@ -33,7 +33,7 @@ type Filters = {
   warehouseId: string
   dateFrom: string
   dateTo: string
-  referenceType: '' | 'manual' | 'incoming_delivery'
+  referenceType: '' | 'manual' | 'incoming_delivery' | 'outgoing_order'
 }
 
 function emptyForm(): FormState {
@@ -125,6 +125,7 @@ export function MovementsClient({ products, locations, movements, balances }: Pr
       if (filters.referenceType) {
         if (filters.referenceType === 'manual' && mv.reference_type != null) return false
         if (filters.referenceType === 'incoming_delivery' && mv.reference_type !== 'incoming_delivery') return false
+        if (filters.referenceType === 'outgoing_order' && mv.reference_type !== 'outgoing_order') return false
       }
       return true
     })
@@ -211,6 +212,7 @@ export function MovementsClient({ products, locations, movements, balances }: Pr
   const refLabel = (mv: Movement): string => {
     if (!mv.reference_type) return '—'
     if (mv.reference_type === 'incoming_delivery') return m.refDelivery
+    if (mv.reference_type === 'outgoing_order') return m.refOutgoingOrder
     return mv.reference_type
   }
 
@@ -221,7 +223,7 @@ export function MovementsClient({ products, locations, movements, balances }: Pr
       const product = productMap.get(mv.product_id)
       const fromLoc = mv.from_location_id ? locationMap.get(mv.from_location_id) : null
       const toLoc = mv.to_location_id ? locationMap.get(mv.to_location_id) : null
-      const refVal = !mv.reference_type ? 'Ръчно' : mv.reference_type === 'incoming_delivery' ? 'Вх. доставка' : mv.reference_type
+      const refVal = !mv.reference_type ? 'Ръчно' : mv.reference_type === 'incoming_delivery' ? 'Вх. доставка' : mv.reference_type === 'outgoing_order' ? 'Изх. поръчка' : mv.reference_type
       return [
         csvDateTime(mv.created_at),
         TYPE_LABEL[mv.movement_type] ?? mv.movement_type,
@@ -549,6 +551,7 @@ export function MovementsClient({ products, locations, movements, balances }: Pr
                   <option value="">{m.filterAllRef}</option>
                   <option value="manual">{m.filterManual}</option>
                   <option value="incoming_delivery">{m.filterDelivery}</option>
+                  <option value="outgoing_order">{m.filterOutgoingOrder}</option>
                 </select>
               </div>
             </div>

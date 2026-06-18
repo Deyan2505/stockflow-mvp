@@ -24,15 +24,17 @@ type Props = {
   products: Product[]
   onClose: () => void
   onEditHeader: () => void
+  onIssueStock?: () => void
 }
 
 const statusColor: Record<string, string> = {
   draft:     'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
   open:      'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400',
+  fulfilled: 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400',
   cancelled: 'bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400',
 }
 
-export function OrderDetailModal({ order, products, onClose, onEditHeader }: Props) {
+export function OrderDetailModal({ order, products, onClose, onEditHeader, onIssueStock }: Props) {
   const { t } = useT()
   const o = t.orders
 
@@ -60,7 +62,7 @@ export function OrderDetailModal({ order, products, onClose, onEditHeader }: Pro
   const [barcodeMsg, setBarcodeMsg]   = useState<{ type: 'found' | 'notFound'; text: string } | null>(null)
   const [isBarcodeSearching, startBarcodeSearch] = useTransition()
 
-  const canEdit = order.status !== 'cancelled'
+  const canEdit = order.status === 'draft' || order.status === 'open'
 
   const refresh = async () => {
     const fresh = await getOrderItems(order.id)
@@ -174,8 +176,16 @@ export function OrderDetailModal({ order, products, onClose, onEditHeader }: Pro
                 statusColor[order.status] ?? statusColor.draft,
               )}
             >
-              {{ draft: o.statusDraft, open: o.statusOpen, cancelled: o.statusCancelled }[order.status] ?? order.status}
+              {{ draft: o.statusDraft, open: o.statusOpen, cancelled: o.statusCancelled, fulfilled: o.statusFulfilled }[order.status] ?? order.status}
             </span>
+            {order.status === 'open' && onIssueStock && (
+              <button
+                onClick={onIssueStock}
+                className="rounded-lg bg-orange-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-orange-700"
+              >
+                {o.issueStockBtn}
+              </button>
+            )}
             {canEdit && (
               <button
                 onClick={onEditHeader}
@@ -203,6 +213,12 @@ export function OrderDetailModal({ order, products, onClose, onEditHeader }: Pro
             <span className="text-gray-400">{o.fExpectedDate}:</span>{' '}
             <span className="text-gray-700 dark:text-gray-300">{order.expected_date ?? '—'}</span>
           </span>
+          {order.issued_date && (
+            <span>
+              <span className="text-gray-400">{o.fIssuedDate}:</span>{' '}
+              <span className="text-gray-700 dark:text-gray-300">{order.issued_date}</span>
+            </span>
+          )}
           {order.note && (
             <span className="w-full">
               <span className="text-gray-400">{o.fNote}:</span>{' '}
@@ -217,8 +233,8 @@ export function OrderDetailModal({ order, products, onClose, onEditHeader }: Pro
             {o.itemsTitle}
           </h3>
 
-          {/* Cancelled notice */}
-          {!canEdit && (
+          {/* Status notices */}
+          {order.status === 'cancelled' && (
             <p className="mb-4 rounded-lg bg-red-50 px-4 py-2 text-xs text-red-600 dark:bg-red-900/10 dark:text-red-400">
               {o.itemsCancelledNote}
             </p>
@@ -244,6 +260,9 @@ export function OrderDetailModal({ order, products, onClose, onEditHeader }: Pro
                     </th>
                     <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-gray-400">
                       {o.itemColQty}
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-gray-400">
+                      {o.itemColIssued}
                     </th>
                     <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-gray-400">
                       {o.itemColUnit}
@@ -273,6 +292,15 @@ export function OrderDetailModal({ order, products, onClose, onEditHeader }: Pro
                           <span className="text-gray-700 dark:text-gray-300">
                             {item.ordered_quantity}
                           </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2 tabular-nums">
+                        {item.issued_quantity > 0 ? (
+                          <span className="font-medium text-amber-600 dark:text-amber-400">
+                            {item.issued_quantity}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">0</span>
                         )}
                       </td>
                       <td className="px-4 py-2 text-gray-500 dark:text-gray-400">

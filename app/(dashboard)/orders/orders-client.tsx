@@ -2,18 +2,20 @@
 
 import { useState, useTransition, useMemo } from 'react'
 import { Search } from 'lucide-react'
-import { type Order, type Product, type OrderResult, cancelOrder } from './actions'
+import { type Order, type Product, type Location, type OrderResult, cancelOrder } from './actions'
 import { OrderModal } from './order-modal'
 import { OrderDetailModal } from './order-detail-modal'
+import { IssueModal } from './issue-modal'
 import { cn } from '@/lib/utils'
 import { useT } from '@/lib/i18n'
 
 type Props = {
   orders: Order[]
   products: Product[]
+  locations: Location[]
 }
 
-export function OrdersClient({ orders, products }: Props) {
+export function OrdersClient({ orders, products, locations }: Props) {
   const { t } = useT()
   const o = t.orders
 
@@ -21,6 +23,7 @@ export function OrdersClient({ orders, products }: Props) {
   const [statusFilter, setStatusFilter] = useState('all')
   const [modal, setModal] = useState<Order | null | 'new'>(null)
   const [detailOrder, setDetailOrder] = useState<Order | null>(null)
+  const [issueModalOrder, setIssueModalOrder] = useState<Order | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
@@ -29,6 +32,7 @@ export function OrdersClient({ orders, products }: Props) {
     { value: 'all',       label: o.filterAll       },
     { value: 'draft',     label: o.statusDraft     },
     { value: 'open',      label: o.statusOpen      },
+    { value: 'fulfilled', label: o.statusFulfilled },
     { value: 'cancelled', label: o.statusCancelled },
   ]
 
@@ -65,11 +69,13 @@ export function OrdersClient({ orders, products }: Props) {
     const colorMap: Record<string, string> = {
       draft:     'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
       open:      'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400',
+      fulfilled: 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400',
       cancelled: 'bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400',
     }
     const labelMap: Record<string, string> = {
       draft:     o.statusDraft,
       open:      o.statusOpen,
+      fulfilled: o.statusFulfilled,
       cancelled: o.statusCancelled,
     }
     return (
@@ -188,6 +194,14 @@ export function OrdersClient({ orders, products }: Props) {
                       >
                         {o.detail}
                       </button>
+                      {item.status === 'open' && (
+                        <button
+                          onClick={() => setIssueModalOrder(item)}
+                          className="text-xs font-medium text-orange-600 hover:underline dark:text-orange-400"
+                        >
+                          {o.issueStockBtn}
+                        </button>
+                      )}
                       {canEdit(item.status) && (
                         <button
                           onClick={() => setModal(item)}
@@ -230,6 +244,25 @@ export function OrdersClient({ orders, products }: Props) {
             const ord = detailOrder
             setDetailOrder(null)
             setModal(ord)
+          }}
+          onIssueStock={() => {
+            const ord = detailOrder
+            setDetailOrder(null)
+            setIssueModalOrder(ord)
+          }}
+        />
+      )}
+
+      {issueModalOrder !== null && (
+        <IssueModal
+          order={issueModalOrder}
+          locations={locations}
+          onClose={(msg) => {
+            setIssueModalOrder(null)
+            if (msg) {
+              setSuccessMsg(msg)
+              setTimeout(() => setSuccessMsg(null), 3500)
+            }
           }}
         />
       )}

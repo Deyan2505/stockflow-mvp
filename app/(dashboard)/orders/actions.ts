@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { findProductByBarcode } from '@/lib/barcode-utils'
+import { recordMovement } from '@/lib/movement-engine'
 
 const CO = process.env.DEMO_COMPANY_ID!
 
@@ -15,9 +16,10 @@ export type Order = {
   company_id: string
   order_number: string
   customer_name: string | null
-  status: 'draft' | 'open' | 'cancelled'
+  status: 'draft' | 'open' | 'fulfilled' | 'cancelled'
   order_date: string | null
   expected_date: string | null
+  issued_date: string | null
   note: string | null
   created_at: string
   updated_at: string
@@ -45,9 +47,13 @@ export type OrderItem = {
   order_id: string
   product_id: string
   ordered_quantity: number
+  issued_quantity: number
+  location_id: string | null
   created_at: string
   products: { name: string; unit: string | null } | null
 }
+
+export type Location = { id: string; code: string; warehouses: { name: string } | null }
 
 export type OrderItemResult = { success: true } | { success: false; error: string }
 
@@ -143,7 +149,7 @@ export async function getOrderItems(orderId: string): Promise<OrderItem[]> {
   const sb = createAdminClient()
   const { data } = await sb
     .from('outgoing_order_items')
-    .select('id, order_id, product_id, ordered_quantity, created_at, products(name, unit)')
+    .select('id, order_id, product_id, ordered_quantity, issued_quantity, location_id, created_at, products(name, unit)')
     .eq('order_id', orderId)
     .order('created_at', { ascending: true })
   return (data ?? []) as unknown as OrderItem[]
@@ -205,6 +211,136 @@ export async function removeOrderItem(itemId: string): Promise<OrderItemResult> 
     if (error) throw new Error(error.message)
     revalidatePath('/orders')
     return { success: true }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Грешка, опитай отново' }
+  }
+}
+
+// ─── Fulfillment — Issue Stock ─────────────────────────────────────────────────
+// Creates OUT stock movements only on explicit user action.
+// Never triggered automatically by order creation or item addition.
+
+export type IssueItem = {
+  item_id: string
+  product_id: string
+  from_location_id: string
+}
+
+export type IssueOrderInput = {
+  order_id: string
+  items: IssueItem[]
+}
+
+export type IssueResult =
+  | { success: true; newStatus: 'fulfilled' }
+  | { success: false; error: string }
+
+export async function issueOrder(input: IssueOrderInput): Promise<IssueResult> {
+  try {
+    const sb = createAdminClient()
+
+    // 1. Re-read order — guard against double-issue / cancelled / draft
+    const { data: order } = await sb
+      .from('outgoing_orders')
+      .select('id, status, order_number')
+      .eq('id', input.order_id)
+      .eq('company_id', CO)
+      .single()
+
+    if (!order) throw new Error('Поръчката не е намерена')
+    if (order.status === 'fulfilled')
+      throw new Error('Поръчката вече е изцяло изпълнена')
+    if (order.status === 'cancelled')
+      throw new Error('Отменена поръчка не може да бъде изпълнена')
+    if (order.status === 'draft')
+      throw new Error('Чернова поръчка не може да бъде изпълнена')
+
+    // 2. Re-read items from DB — authoritative quantities
+    const { data: dbItems } = await sb
+      .from('outgoing_order_items')
+      .select('id, product_id, ordered_quantity, issued_quantity')
+      .eq('order_id', input.order_id)
+      .eq('company_id', CO)
+
+    const dbItemsArr = dbItems ?? []
+    const locationMap = new Map(input.items.map((i) => [i.item_id, i.from_location_id]))
+
+    // 3. Build work list — server computes remaining qty (Variant A: full-order, all-or-nothing)
+    type ItemToProcess = {
+      item_id: string
+      product_id: string
+      qty: number
+      from_location_id: string
+    }
+
+    const toProcess: ItemToProcess[] = []
+    for (const dbItem of dbItemsArr) {
+      const remaining = Number(dbItem.ordered_quantity) - Number(dbItem.issued_quantity)
+      if (remaining <= 0) continue
+
+      const from_location_id = locationMap.get(dbItem.id) ?? ''
+      if (!from_location_id)
+        throw new Error('Изберете локация за всеки артикул за изписване')
+
+      toProcess.push({ item_id: dbItem.id, product_id: dbItem.product_id, qty: remaining, from_location_id })
+    }
+
+    if (toProcess.length === 0)
+      throw new Error('Всички артикули са вече изцяло изписани')
+
+    // 4. Pre-validate stock for ALL items before any movement (all-or-nothing)
+    for (const item of toProcess) {
+      const { data: bal } = await sb
+        .from('inventory_balances')
+        .select('quantity_available, products(unit)')
+        .eq('company_id', CO)
+        .eq('product_id', item.product_id)
+        .eq('location_id', item.from_location_id)
+        .maybeSingle()
+
+      const available = Number(bal?.quantity_available ?? 0)
+      if (item.qty > available) {
+        const unit = (bal?.products as unknown as { unit: string } | null)?.unit ?? 'бр.'
+        throw new Error(`Няма достатъчна наличност. Налични са само ${available} ${unit}.`)
+      }
+    }
+
+    // 5. Execute OUT movements + update issued_quantity per item (full remaining)
+    for (const item of toProcess) {
+      await recordMovement({
+        movement_type:    'OUT',
+        product_id:       item.product_id,
+        from_location_id: item.from_location_id,
+        to_location_id:   null,
+        quantity:         item.qty,
+        note:             `Изписване по поръчка #${order.order_number}`,
+        reference_type:   'outgoing_order',
+        reference_id:     order.id,
+      })
+
+      const dbItem = dbItemsArr.find((i) => i.id === item.item_id)!
+      await sb
+        .from('outgoing_order_items')
+        .update({ issued_quantity: Number(dbItem.issued_quantity) + item.qty })
+        .eq('id', item.item_id)
+        .eq('company_id', CO)
+    }
+
+    // 6. Mark order fulfilled + set issued_date
+    await sb
+      .from('outgoing_orders')
+      .update({
+        status:      'fulfilled',
+        issued_date: new Date().toISOString().substring(0, 10),
+      })
+      .eq('id', input.order_id)
+      .eq('company_id', CO)
+
+    revalidatePath('/orders')
+    revalidatePath('/movements')
+    revalidatePath('/inventory')
+
+    return { success: true, newStatus: 'fulfilled' }
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : 'Грешка, опитай отново' }
   }
