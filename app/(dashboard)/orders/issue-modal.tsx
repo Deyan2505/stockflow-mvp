@@ -87,6 +87,7 @@ export function IssueModal({ order, locations, onClose }: Props) {
     })
   }
 
+  const noItems = !loading && rows.length === 0
   const allDone = rows.length > 0 && rows.every((r) => r.remaining === 0)
 
   const cellCls =
@@ -119,6 +120,8 @@ export function IssueModal({ order, locations, onClose }: Props) {
           <div className="flex-1 overflow-y-auto p-6">
             {loading ? (
               <p className="py-10 text-center text-sm text-gray-400 dark:text-gray-500">{o.loading}</p>
+            ) : noItems ? (
+              <p className="py-10 text-center text-sm text-gray-400 dark:text-gray-500">{o.issueNoItems}</p>
             ) : allDone ? (
               <p className="py-10 text-center text-sm text-gray-400 dark:text-gray-500">{o.issueAllDone}</p>
             ) : (
@@ -221,7 +224,7 @@ export function IssueModal({ order, locations, onClose }: Props) {
             </button>
             <button
               type="submit"
-              disabled={isPending || loading || allDone}
+              disabled={isPending || loading || noItems || allDone}
               className="rounded-lg bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700 disabled:opacity-50"
             >
               {isPending ? o.saving : o.issueConfirm}

@@ -181,7 +181,9 @@ export function OrderDetailModal({ order, products, onClose, onEditHeader, onIss
             {order.status === 'open' && onIssueStock && (
               <button
                 onClick={onIssueStock}
-                className="rounded-lg bg-orange-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-orange-700"
+                disabled={!loading && items.length === 0}
+                title={!loading && items.length === 0 ? o.issueNoItems : undefined}
+                className="rounded-lg bg-orange-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {o.issueStockBtn}
               </button>
