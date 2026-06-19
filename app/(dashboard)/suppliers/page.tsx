@@ -9,7 +9,7 @@ import { can } from '@/lib/permissions'
 const CO = process.env.DEMO_COMPANY_ID!
 
 export default async function SuppliersPage() {
-  const canWrite = can(getCurrentRole(), 'manage_suppliers')
+  const canWrite = can(await getCurrentRole(), 'manage_suppliers')
   const sb = createAdminClient()
   const { data } = await sb
     .from('suppliers')

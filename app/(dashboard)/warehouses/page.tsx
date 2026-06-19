@@ -7,7 +7,7 @@ import { getCurrentRole } from '@/lib/current-user'
 import { can } from '@/lib/permissions'
 
 export default async function WarehousesPage() {
-  const canWrite = can(getCurrentRole(), 'manage_warehouses')
+  const canWrite = can(await getCurrentRole(), 'manage_warehouses')
   const sb = createAdminClient()
 
   const { data, error } = await sb

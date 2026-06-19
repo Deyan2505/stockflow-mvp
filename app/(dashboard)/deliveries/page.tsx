@@ -9,7 +9,7 @@ import { can } from '@/lib/permissions'
 const CO = process.env.DEMO_COMPANY_ID!
 
 export default async function DeliveriesPage() {
-  const canReceive = can(getCurrentRole(), 'receive_delivery')
+  const canReceive = can(await getCurrentRole(), 'receive_delivery')
   const sb = createAdminClient()
 
   const [deliveriesRes, suppliersRes, productsRes, locationsRes, movementsRes] = await Promise.all([

@@ -7,7 +7,7 @@ import { getCurrentRole } from '@/lib/current-user'
 import { can } from '@/lib/permissions'
 
 export default async function MovementsPage() {
-  const canWrite = can(getCurrentRole(), 'create_movement')
+  const canWrite = can(await getCurrentRole(), 'create_movement')
   const sb = createAdminClient()
   const co = process.env.DEMO_COMPANY_ID!
 

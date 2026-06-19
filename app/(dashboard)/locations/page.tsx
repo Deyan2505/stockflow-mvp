@@ -8,7 +8,7 @@ import { getCurrentRole } from '@/lib/current-user'
 import { can } from '@/lib/permissions'
 
 export default async function LocationsPage() {
-  const canWrite = can(getCurrentRole(), 'manage_locations')
+  const canWrite = can(await getCurrentRole(), 'manage_locations')
   const sb = createAdminClient()
   const co = process.env.DEMO_COMPANY_ID!
 
