@@ -17,6 +17,7 @@ const dict = {
       orders: 'Изходящи поръчки',
       reports: 'Справки',
       version: 'MVP · v0.5',
+      logout: 'Изход',
     },
     dashboard: {
       title: 'Начало', subtitle: 'Преглед на наличността',
@@ -434,6 +435,7 @@ const dict = {
       orders: 'Outgoing Orders',
       reports: 'Reports',
       version: 'MVP · v0.5',
+      logout: 'Sign out',
     },
     dashboard: {
       title: 'Home', subtitle: 'Stock overview',

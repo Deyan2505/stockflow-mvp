@@ -3,12 +3,13 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
-  LayoutDashboard, Package, Warehouse, MapPin, ArrowRightLeft, BarChart3, Truck, ClipboardList, TrendingDown, ScanLine, ShoppingCart,
+  LayoutDashboard, Package, Warehouse, MapPin, ArrowRightLeft, BarChart3, Truck, ClipboardList, TrendingDown, ScanLine, ShoppingCart, LogOut,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ThemeToggle } from './theme-toggle'
 import { LanguageToggle } from './language-toggle'
 import { useT } from '@/lib/i18n'
+import { logout } from '@/app/(auth)/actions'
 
 export function Sidebar() {
   const pathname = usePathname()
@@ -69,11 +70,22 @@ export function Sidebar() {
       </nav>
 
       {/* Footer */}
-      <div className="flex items-center justify-between border-t border-gray-100 px-4 py-3 dark:border-gray-800">
-        <p className="text-xs text-gray-400 dark:text-gray-600">{t.nav.version}</p>
-        <div className="flex items-center gap-2">
-          <LanguageToggle />
-          <ThemeToggle />
+      <div className="border-t border-gray-100 px-3 py-3 dark:border-gray-800">
+        <form action={logout}>
+          <button
+            type="submit"
+            className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+          >
+            <LogOut className="h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500" />
+            {t.nav.logout}
+          </button>
+        </form>
+        <div className="mt-2 flex items-center justify-between px-3">
+          <p className="text-xs text-gray-400 dark:text-gray-600">{t.nav.version}</p>
+          <div className="flex items-center gap-2">
+            <LanguageToggle />
+            <ThemeToggle />
+          </div>
         </div>
       </div>
     </aside>
