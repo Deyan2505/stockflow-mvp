@@ -37,11 +37,92 @@ export default async function MovementsPage() {
     )
   }
 
+  // Batch lookup for v0.6.2 (Movement History Business Direction Display)
+  const ordersMap = new Map<string, string>()
+  const suppliersMap = new Map<string, string>()
+
+  const rawMovements = (movements as Movement[]) ?? []
+
+  if (rawMovements.length > 0) {
+    const orderIds = Array.from(new Set(
+      rawMovements
+        .filter((m) => m.reference_type === 'outgoing_order' && m.reference_id)
+        .map((m) => m.reference_id as string)
+    ))
+
+    const deliveryIds = Array.from(new Set(
+      rawMovements
+        .filter((m) => m.reference_type === 'incoming_delivery' && m.reference_id)
+        .map((m) => m.reference_id as string)
+    ))
+
+    if (orderIds.length > 0) {
+      try {
+        const { data: ordersData } = await sb
+          .from('outgoing_orders')
+          .select('id, customer_name')
+          .in('id', orderIds)
+        const orders = ordersData as { id: string; customer_name: string | null }[] | null
+        if (orders) {
+          orders.forEach((o) => {
+            if (o.customer_name) ordersMap.set(o.id, o.customer_name)
+          })
+        }
+      } catch (e) {
+        console.error('Error fetching outgoing orders for movements:', e)
+      }
+    }
+
+    if (deliveryIds.length > 0) {
+      try {
+        // Safe two-step batch fetch for deliveries and suppliers
+        const { data: deliveriesData } = await sb
+          .from('incoming_deliveries')
+          .select('id, supplier_id')
+          .in('id', deliveryIds)
+        const deliveries = deliveriesData as { id: string; supplier_id: string | null }[] | null
+
+        if (deliveries && deliveries.length > 0) {
+          const supplierIds = Array.from(new Set(
+            deliveries
+              .filter((d) => d.supplier_id)
+              .map((d) => d.supplier_id as string)
+          ))
+
+          if (supplierIds.length > 0) {
+            const { data: suppliersData } = await sb
+              .from('suppliers')
+              .select('id, name')
+              .in('id', supplierIds)
+            const suppliers = suppliersData as { id: string; name: string }[] | null
+
+            if (suppliers) {
+              const sMap = new Map(suppliers.map((s) => [s.id, s.name]))
+              deliveries.forEach((d) => {
+                const sName = d.supplier_id ? sMap.get(d.supplier_id) : undefined
+                if (sName) suppliersMap.set(d.id, sName)
+              })
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Error fetching suppliers/deliveries for movements:', e)
+      }
+    }
+  }
+
+  // Enrich movements with fetched customer_name and supplier_name
+  const enrichedMovements = rawMovements.map((m) => ({
+    ...m,
+    customer_name: m.reference_type === 'outgoing_order' && m.reference_id ? (ordersMap.get(m.reference_id) ?? null) : null,
+    supplier_name: m.reference_type === 'incoming_delivery' && m.reference_id ? (suppliersMap.get(m.reference_id) ?? null) : null,
+  }))
+
   return (
     <MovementsClient
       products={(products as ProductOption[]) ?? []}
       locations={(locations as LocationOption[]) ?? []}
-      movements={(movements as Movement[]) ?? []}
+      movements={(enrichedMovements as Movement[]) ?? []}
       balances={(balances as BalanceRow[]) ?? []}
     />
   )

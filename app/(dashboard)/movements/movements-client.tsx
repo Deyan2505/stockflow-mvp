@@ -218,18 +218,40 @@ export function MovementsClient({ products, locations, movements, balances }: Pr
 
   const active = hasActiveFilters(filters)
 
+  const getFromDisplay = (mv: Movement): string => {
+    if (mv.movement_type === 'IN') {
+      if (mv.reference_type === 'incoming_delivery') {
+        const sName = mv.supplier_name?.trim()
+        return sName ? `${m.supplierLabelPrefix}${sName}` : m.displayManualInSupplier
+      }
+      return m.displayManualInSupplier
+    }
+    const fromLoc = mv.from_location_id ? locationMap.get(mv.from_location_id) : null
+    return fromLoc ? `${fromLoc.warehouses?.name ?? '?'} / ${fromLoc.code}` : '—'
+  }
+
+  const getToDisplay = (mv: Movement): string => {
+    if (mv.movement_type === 'OUT') {
+      if (mv.reference_type === 'outgoing_order') {
+        const cName = mv.customer_name?.trim()
+        return cName ? `${m.customerLabelPrefix}${cName}` : `${m.customerLabelPrefix}${t.orders.noCustomer}`
+      }
+      return m.displayManualOutCustomer
+    }
+    const toLoc = mv.to_location_id ? locationMap.get(mv.to_location_id) : null
+    return toLoc ? `${toLoc.warehouses?.name ?? '?'} / ${toLoc.code}` : '—'
+  }
+
   const buildMovementRows = () =>
     filteredMovements.map((mv) => {
       const product = productMap.get(mv.product_id)
-      const fromLoc = mv.from_location_id ? locationMap.get(mv.from_location_id) : null
-      const toLoc = mv.to_location_id ? locationMap.get(mv.to_location_id) : null
       const refVal = !mv.reference_type ? 'Ръчно' : mv.reference_type === 'incoming_delivery' ? 'Вх. доставка' : mv.reference_type === 'outgoing_order' ? 'Изх. поръчка' : mv.reference_type
       return [
         csvDateTime(mv.created_at),
         TYPE_LABEL[mv.movement_type] ?? mv.movement_type,
         product?.name ?? '',
-        fromLoc ? `${fromLoc.warehouses?.name ?? ''} / ${fromLoc.code}` : '',
-        toLoc ? `${toLoc.warehouses?.name ?? ''} / ${toLoc.code}` : '',
+        getFromDisplay(mv),
+        getToDisplay(mv),
         Number(mv.quantity),
         product?.unit ?? '',
         mv.note ?? '',
@@ -238,7 +260,7 @@ export function MovementsClient({ products, locations, movements, balances }: Pr
     })
 
   const handleExport = () => {
-    const headers = ['Дата', 'Тип', 'Продукт', 'От локация', 'До локация', 'Количество', 'Единица', 'Забележка', 'Източник']
+    const headers = ['Дата', 'Тип', 'Продукт', 'От', 'До', 'Количество', 'Единица', 'Забележка', 'Източник']
     exportToCSV(`stockflow_movements_${todayStr()}.csv`, headers, buildMovementRows())
   }
 
@@ -247,8 +269,8 @@ export function MovementsClient({ products, locations, movements, balances }: Pr
       { header: 'Дата', width: 20 },
       { header: 'Тип', width: 10 },
       { header: 'Продукт', width: 28 },
-      { header: 'От локация', width: 22 },
-      { header: 'До локация', width: 22 },
+      { header: 'От', width: 22 },
+      { header: 'До', width: 22 },
       { header: 'Количество', width: 13 },
       { header: 'Единица', width: 10 },
       { header: 'Забележка', width: 30 },
@@ -584,8 +606,6 @@ export function MovementsClient({ products, locations, movements, balances }: Pr
                   ) : (
                     filteredMovements.map((mv) => {
                       const product = productMap.get(mv.product_id)
-                      const fromLoc = mv.from_location_id ? locationMap.get(mv.from_location_id) : null
-                      const toLoc = mv.to_location_id ? locationMap.get(mv.to_location_id) : null
 
                       return (
                         <tr key={mv.id} className="transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/50">
@@ -606,10 +626,10 @@ export function MovementsClient({ products, locations, movements, balances }: Pr
                           </td>
                           <td className="px-4 py-3 text-gray-700 dark:text-gray-300">{product?.name ?? '—'}</td>
                           <td className="px-4 py-3 text-xs text-gray-500 dark:text-gray-400">
-                            {fromLoc ? `${fromLoc.warehouses?.name ?? '?'} / ${fromLoc.code}` : '—'}
+                            {getFromDisplay(mv)}
                           </td>
                           <td className="px-4 py-3 text-xs text-gray-500 dark:text-gray-400">
-                            {toLoc ? `${toLoc.warehouses?.name ?? '?'} / ${toLoc.code}` : '—'}
+                            {getToDisplay(mv)}
                           </td>
                           <td className="px-4 py-3 font-mono text-sm font-medium text-gray-900 dark:text-white">
                             {Number(mv.quantity)}

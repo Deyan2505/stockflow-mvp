@@ -42,6 +42,8 @@ export type Movement = {
   created_at: string
   reference_type: string | null
   reference_id: string | null
+  customer_name?: string | null
+  supplier_name?: string | null
 }
 
 export type MovementResult = { success: true } | { success: false; error: string }

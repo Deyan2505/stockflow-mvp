@@ -138,6 +138,10 @@ const dict = {
       barcodeClear: 'Изчисти',
       barcodeFound: (name: string) => `Намерен: ${name}`,
       barcodeNotFound: 'Продуктът не е намерен за този баркод',
+      displayManualInSupplier: 'Външен източник',
+      displayManualOutCustomer: 'Външен получател',
+      supplierLabelPrefix: 'Доставчик: ',
+      customerLabelPrefix: 'Клиент: ',
     },
     inventory: {
       title: 'Наличност', subtitle: 'Текущо количество по продукт и локация',
@@ -539,6 +543,10 @@ const dict = {
       barcodeClear: 'Clear',
       barcodeFound: (name: string) => `Found: ${name}`,
       barcodeNotFound: 'No product found for this barcode',
+      displayManualInSupplier: 'External source',
+      displayManualOutCustomer: 'External destination',
+      supplierLabelPrefix: 'Supplier: ',
+      customerLabelPrefix: 'Customer: ',
     },
     inventory: {
       title: 'Inventory', subtitle: 'Current quantity by product and location',
