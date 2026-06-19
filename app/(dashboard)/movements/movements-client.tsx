@@ -17,6 +17,7 @@ type Props = {
   balances: BalanceRow[]
   suppliers: SupplierOption[]
   customers: CustomerOption[]
+  canWrite: boolean
 }
 
 type Tab = 'IN' | 'OUT' | 'TRANSFER'
@@ -68,7 +69,7 @@ function hasActiveFilters(f: Filters): boolean {
   return !!(f.type || f.productId || f.warehouseId || f.dateFrom || f.dateTo || f.referenceType)
 }
 
-export function MovementsClient({ products, locations, movements, balances, suppliers, customers }: Props) {
+export function MovementsClient({ products, locations, movements, balances, suppliers, customers, canWrite }: Props) {
   const { t } = useT()
   const m = t.movements
 
@@ -327,6 +328,8 @@ export function MovementsClient({ products, locations, movements, balances, supp
       <div className="grid grid-cols-3 gap-6">
         {/* LEFT: Form */}
         <div className="col-span-1">
+          {canWrite ? (
+            <>
           <div className="flex rounded-lg border border-gray-100 bg-gray-50 p-1 dark:border-gray-800 dark:bg-gray-800">
             {tabs.map((tb) => (
               <button
@@ -550,6 +553,13 @@ export function MovementsClient({ products, locations, movements, balances, supp
               {isPending ? m.saving : m.saveBtn(tabConfig.label)}
             </button>
           </form>
+            </>) : (
+              <div className="rounded-xl border border-gray-100 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
+                <span className="inline-flex rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">
+                  {t.common.readOnly}
+                </span>
+              </div>
+            )}
         </div>
 
         {/* RIGHT: History */}

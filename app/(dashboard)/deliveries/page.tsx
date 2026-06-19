@@ -3,10 +3,13 @@ export const dynamic = 'force-dynamic'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { DeliveriesClient } from './deliveries-client'
 import type { Delivery } from './actions'
+import { getCurrentRole } from '@/lib/current-user'
+import { can } from '@/lib/permissions'
 
 const CO = process.env.DEMO_COMPANY_ID!
 
 export default async function DeliveriesPage() {
+  const canReceive = can(getCurrentRole(), 'receive_delivery')
   const sb = createAdminClient()
 
   const [deliveriesRes, suppliersRes, productsRes, locationsRes, movementsRes] = await Promise.all([
@@ -41,6 +44,7 @@ export default async function DeliveriesPage() {
       locations={(locationsRes.data ?? []) as { id: string; code: string }[]}
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       deliveryMovements={deliveryMovements as any[]}
+      canReceive={canReceive}
     />
   )
 }

@@ -15,9 +15,10 @@ type Props = {
   products: { id: string; name: string; unit: string }[]
   locations: { id: string; code: string }[]
   deliveryMovements: DeliveryMovement[]
+  canReceive: boolean
 }
 
-export function DeliveriesClient({ deliveries, suppliers, products, locations, deliveryMovements }: Props) {
+export function DeliveriesClient({ deliveries, suppliers, products, locations, deliveryMovements, canReceive }: Props) {
   const { t } = useT()
   const d = t.deliveries
 
@@ -100,7 +101,7 @@ export function DeliveriesClient({ deliveries, suppliers, products, locations, d
   const canEdit = (status: Delivery['status']) => status === 'draft' || status === 'expected'
 
   // draft, expected, and partially_received can still receive more stock
-  const canReceive = (status: Delivery['status']) =>
+  const isReceivable = (status: Delivery['status']) =>
     status === 'draft' || status === 'expected' || status === 'partially_received'
 
   return (
@@ -213,7 +214,7 @@ export function DeliveriesClient({ deliveries, suppliers, products, locations, d
                       </button>
 
                       {/* Receive: draft / expected / partially_received */}
-                      {canReceive(item.status) && (
+                      {isReceivable(item.status) && canReceive && (
                         <button
                           onClick={() => setReceiveModal(item)}
                           className="text-xs font-medium text-green-600 hover:underline dark:text-green-400"
@@ -261,7 +262,7 @@ export function DeliveriesClient({ deliveries, suppliers, products, locations, d
       )}
 
       {/* Receive modal */}
-      {receiveModal !== null && (
+      {canReceive && receiveModal !== null && (
         <ReceiveModal
           delivery={receiveModal}
           products={products}

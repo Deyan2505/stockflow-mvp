@@ -3,8 +3,11 @@ export const dynamic = 'force-dynamic'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { MovementsClient } from './movements-client'
 import type { ProductOption, LocationOption, BalanceRow, Movement, SupplierOption, CustomerOption } from './actions'
+import { getCurrentRole } from '@/lib/current-user'
+import { can } from '@/lib/permissions'
 
 export default async function MovementsPage() {
+  const canWrite = can(getCurrentRole(), 'create_movement')
   const sb = createAdminClient()
   const co = process.env.DEMO_COMPANY_ID!
 
@@ -185,6 +188,7 @@ export default async function MovementsPage() {
       balances={(balances as BalanceRow[]) ?? []}
       suppliers={(dbSuppliers as SupplierOption[]) ?? []}
       customers={(dbCustomers as CustomerOption[]) ?? []}
+      canWrite={canWrite}
     />
   )
 }

@@ -13,9 +13,10 @@ type Props = {
   orders: Order[]
   products: Product[]
   locations: Location[]
+  canIssue: boolean
 }
 
-export function OrdersClient({ orders, products, locations }: Props) {
+export function OrdersClient({ orders, products, locations, canIssue }: Props) {
   const { t } = useT()
   const o = t.orders
 
@@ -194,7 +195,7 @@ export function OrdersClient({ orders, products, locations }: Props) {
                       >
                         {o.detail}
                       </button>
-                      {item.status === 'open' && (
+                      {item.status === 'open' && canIssue && (
                         <button
                           onClick={() => setIssueModalOrder(item)}
                           className="text-xs font-medium text-orange-600 hover:underline dark:text-orange-400"
@@ -245,15 +246,15 @@ export function OrdersClient({ orders, products, locations }: Props) {
             setDetailOrder(null)
             setModal(ord)
           }}
-          onIssueStock={() => {
+          onIssueStock={canIssue ? () => {
             const ord = detailOrder
             setDetailOrder(null)
             setIssueModalOrder(ord)
-          }}
+          } : undefined}
         />
       )}
 
-      {issueModalOrder !== null && (
+      {canIssue && issueModalOrder !== null && (
         <IssueModal
           order={issueModalOrder}
           locations={locations}

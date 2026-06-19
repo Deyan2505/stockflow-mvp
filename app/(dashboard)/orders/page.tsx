@@ -3,10 +3,13 @@ export const dynamic = 'force-dynamic'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { OrdersClient } from './orders-client'
 import type { Order, Product, Location } from './actions'
+import { getCurrentRole } from '@/lib/current-user'
+import { can } from '@/lib/permissions'
 
 const CO = process.env.DEMO_COMPANY_ID!
 
 export default async function OrdersPage() {
+  const canIssue = can(getCurrentRole(), 'issue_stock')
   const sb = createAdminClient()
 
   const [{ data: orders }, { data: products }, { data: locations }] = await Promise.all([
@@ -34,6 +37,7 @@ export default async function OrdersPage() {
       orders={(orders ?? []) as unknown as Order[]}
       products={(products ?? []) as unknown as Product[]}
       locations={(locations ?? []) as unknown as Location[]}
+      canIssue={canIssue}
     />
   )
 }
