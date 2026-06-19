@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Download, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { submitMovement, findProductForMovement } from './actions'
-import type { ProductOption, LocationOption, BalanceRow, Movement, MovementInput, MovementResult } from './actions'
+import type { ProductOption, LocationOption, BalanceRow, Movement, SupplierOption, CustomerOption, MovementActionInput, MovementResult } from './actions'
 import { useT } from '@/lib/i18n'
 import { exportToCSV, csvDateTime, todayStr } from '@/lib/export-csv'
 import { exportToXLSX } from '@/lib/export-xlsx'
@@ -15,6 +15,8 @@ type Props = {
   locations: LocationOption[]
   movements: Movement[]
   balances: BalanceRow[]
+  suppliers: SupplierOption[]
+  customers: CustomerOption[]
 }
 
 type Tab = 'IN' | 'OUT' | 'TRANSFER'
@@ -25,6 +27,9 @@ type FormState = {
   to_location_id: string
   quantity: string
   note: string
+  supplier_id: string
+  customer_id: string
+  new_customer_name: string
 }
 
 type Filters = {
@@ -37,7 +42,16 @@ type Filters = {
 }
 
 function emptyForm(): FormState {
-  return { product_id: '', from_location_id: '', to_location_id: '', quantity: '', note: '' }
+  return {
+    product_id: '',
+    from_location_id: '',
+    to_location_id: '',
+    quantity: '',
+    note: '',
+    supplier_id: '',
+    customer_id: '',
+    new_customer_name: '',
+  }
 }
 
 function emptyFilters(): Filters {
@@ -54,7 +68,7 @@ function hasActiveFilters(f: Filters): boolean {
   return !!(f.type || f.productId || f.warehouseId || f.dateFrom || f.dateTo || f.referenceType)
 }
 
-export function MovementsClient({ products, locations, movements, balances }: Props) {
+export function MovementsClient({ products, locations, movements, balances, suppliers, customers }: Props) {
   const { t } = useT()
   const m = t.movements
 
@@ -85,6 +99,8 @@ export function MovementsClient({ products, locations, movements, balances }: Pr
 
   const activeProducts = useMemo(() => products.filter((p) => p.status === 'active'), [products])
   const activeLocations = useMemo(() => locations.filter((l) => l.status === 'active'), [locations])
+  const activeSuppliers = useMemo(() => suppliers.filter((s) => s.status === 'active'), [suppliers])
+  const activeCustomers = useMemo(() => customers.filter((c) => c.status === 'active'), [customers])
 
   const balanceMap = useMemo(() => {
     const map = new Map<string, number>()
@@ -123,7 +139,7 @@ export function MovementsClient({ products, locations, movements, balances }: Pr
       if (filters.dateFrom && mv.created_at.substring(0, 10) < filters.dateFrom) return false
       if (filters.dateTo && mv.created_at.substring(0, 10) > filters.dateTo) return false
       if (filters.referenceType) {
-        if (filters.referenceType === 'manual' && mv.reference_type != null) return false
+        if (filters.referenceType === 'manual' && mv.reference_type != null && mv.reference_type !== 'supplier' && mv.reference_type !== 'customer') return false
         if (filters.referenceType === 'incoming_delivery' && mv.reference_type !== 'incoming_delivery') return false
         if (filters.referenceType === 'outgoing_order' && mv.reference_type !== 'outgoing_order') return false
       }
@@ -173,19 +189,29 @@ export function MovementsClient({ products, locations, movements, balances }: Pr
     if ((tab === 'IN' || tab === 'TRANSFER') && !form.to_location_id) { setError(m.errToLoc); return }
     if (tab === 'TRANSFER' && form.from_location_id === form.to_location_id) { setError(m.errSameLoc); return }
 
+    if (tab === 'IN' && !form.supplier_id) { setError(m.errSupplierRequired); return }
+    if (tab === 'OUT' && !form.customer_id) { setError(m.errCustomerRequired); return }
+    if (tab === 'OUT' && form.customer_id === 'NEW' && !form.new_customer_name.trim()) {
+      setError(m.errNewCustomerNameRequired)
+      return
+    }
+
     if ((tab === 'OUT' || tab === 'TRANSFER') && availableStock !== null && qty > availableStock) {
       const unit = productMap.get(form.product_id)?.unit ?? ''
       setError(m.errInsufficientStock(availableStock, unit))
       return
     }
 
-    const input: MovementInput = {
+    const input: MovementActionInput = {
       movement_type: tab,
       product_id: form.product_id,
       from_location_id: tab === 'IN' ? null : form.from_location_id || null,
       to_location_id: tab === 'OUT' ? null : form.to_location_id || null,
       quantity: qty,
       note: form.note || null,
+      supplier_id: tab === 'IN' ? form.supplier_id : null,
+      customer_id: tab === 'OUT' ? form.customer_id : null,
+      new_customer_name: tab === 'OUT' && form.customer_id === 'NEW' ? form.new_customer_name : null,
     }
 
     startTransition(async () => {
@@ -213,6 +239,8 @@ export function MovementsClient({ products, locations, movements, balances }: Pr
     if (!mv.reference_type) return '—'
     if (mv.reference_type === 'incoming_delivery') return m.refDelivery
     if (mv.reference_type === 'outgoing_order') return m.refOutgoingOrder
+    if (mv.reference_type === 'supplier') return '—'
+    if (mv.reference_type === 'customer') return '—'
     return mv.reference_type
   }
 
@@ -220,7 +248,7 @@ export function MovementsClient({ products, locations, movements, balances }: Pr
 
   const getFromDisplay = (mv: Movement): string => {
     if (mv.movement_type === 'IN') {
-      if (mv.reference_type === 'incoming_delivery') {
+      if (mv.reference_type === 'incoming_delivery' || mv.reference_type === 'supplier') {
         const sName = mv.supplier_name?.trim()
         return sName ? `${m.supplierLabelPrefix}${sName}` : m.displayManualInSupplier
       }
@@ -236,6 +264,10 @@ export function MovementsClient({ products, locations, movements, balances }: Pr
         const cName = mv.customer_name?.trim()
         return cName ? `${m.customerLabelPrefix}${cName}` : `${m.customerLabelPrefix}${t.orders.noCustomer}`
       }
+      if (mv.reference_type === 'customer') {
+        const cName = mv.customer_name?.trim()
+        return cName ? `${m.customerLabelPrefix}${cName}` : m.displayManualOutCustomer
+      }
       return m.displayManualOutCustomer
     }
     const toLoc = mv.to_location_id ? locationMap.get(mv.to_location_id) : null
@@ -245,7 +277,13 @@ export function MovementsClient({ products, locations, movements, balances }: Pr
   const buildMovementRows = () =>
     filteredMovements.map((mv) => {
       const product = productMap.get(mv.product_id)
-      const refVal = !mv.reference_type ? 'Ръчно' : mv.reference_type === 'incoming_delivery' ? 'Вх. доставка' : mv.reference_type === 'outgoing_order' ? 'Изх. поръчка' : mv.reference_type
+      const refVal = (!mv.reference_type || mv.reference_type === 'supplier' || mv.reference_type === 'customer')
+        ? 'Ръчно'
+        : mv.reference_type === 'incoming_delivery'
+        ? 'Вх. доставка'
+        : mv.reference_type === 'outgoing_order'
+        ? 'Изх. поръчка'
+        : mv.reference_type
       return [
         csvDateTime(mv.created_at),
         TYPE_LABEL[mv.movement_type] ?? mv.movement_type,
@@ -373,6 +411,29 @@ export function MovementsClient({ products, locations, movements, balances }: Pr
                 )}
               </div>
 
+              {/* From supplier (Only for IN) */}
+              {tab === 'IN' && (
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
+                    {m.fFromSupplier} <span className="text-red-500">*</span>
+                  </label>
+                  {activeSuppliers.length === 0 ? (
+                    <p className="text-xs text-red-500">{t.deliveries.noSuppliers}</p>
+                  ) : (
+                    <select
+                      value={form.supplier_id}
+                      onChange={(e) => set('supplier_id', e.target.value)}
+                      className={selectClass}
+                    >
+                      <option value="">{m.selectSupplier}</option>
+                      {activeSuppliers.map((s) => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              )}
+
               {/* From location — OUT + TRANSFER */}
               {(tab === 'OUT' || tab === 'TRANSFER') && (
                 <div>
@@ -391,6 +452,43 @@ export function MovementsClient({ products, locations, movements, balances }: Pr
                     </p>
                   )}
                 </div>
+              )}
+
+              {/* To customer (Only for OUT) */}
+              {tab === 'OUT' && (
+                <>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
+                      {m.fToCustomer} <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={form.customer_id}
+                      onChange={(e) => set('customer_id', e.target.value)}
+                      className={selectClass}
+                    >
+                      <option value="">{m.selectCustomer}</option>
+                      {activeCustomers.map((c) => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                      <option value="NEW">{m.addNewCustomer}</option>
+                    </select>
+                  </div>
+
+                  {form.customer_id === 'NEW' && (
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
+                        {m.fNewCustomerName} <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={form.new_customer_name}
+                        onChange={(e) => set('new_customer_name', e.target.value)}
+                        placeholder={t.orders.customerPlaceholder}
+                        className={selectClass}
+                      />
+                    </div>
+                  )}
+                </>
               )}
 
               {/* To location — IN + TRANSFER */}
