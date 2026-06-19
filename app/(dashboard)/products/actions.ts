@@ -2,6 +2,7 @@
 
 import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
+import { requirePermission } from '@/lib/current-user'
 
 const CO = process.env.DEMO_COMPANY_ID!
 
@@ -33,6 +34,7 @@ export type ProductInput = {
 }
 
 export async function createProduct(input: ProductInput) {
+  await requirePermission('manage_products')
   const sb = createAdminClient()
   const { error } = await sb
     .from('products')
@@ -50,6 +52,7 @@ export async function createProduct(input: ProductInput) {
 }
 
 export async function updateProduct(id: string, input: ProductInput) {
+  await requirePermission('manage_products')
   const sb = createAdminClient()
   const { error } = await sb
     .from('products')
@@ -68,6 +71,7 @@ export async function updateProduct(id: string, input: ProductInput) {
 }
 
 export async function archiveProduct(id: string) {
+  await requirePermission('manage_products')
   const sb = createAdminClient()
   const { error } = await sb
     .from('products')
@@ -80,6 +84,7 @@ export async function archiveProduct(id: string) {
 }
 
 export async function restoreProduct(id: string) {
+  await requirePermission('manage_products')
   const sb = createAdminClient()
   const { error } = await sb
     .from('products')

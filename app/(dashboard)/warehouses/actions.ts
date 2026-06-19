@@ -2,6 +2,7 @@
 
 import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
+import { requirePermission } from '@/lib/current-user'
 
 const CO = process.env.DEMO_COMPANY_ID!
 
@@ -21,6 +22,7 @@ export type WarehouseInput = {
 }
 
 export async function createWarehouse(input: WarehouseInput) {
+  await requirePermission('manage_warehouses')
   const sb = createAdminClient()
   const { error } = await sb
     .from('warehouses')
@@ -31,6 +33,7 @@ export async function createWarehouse(input: WarehouseInput) {
 }
 
 export async function updateWarehouse(id: string, input: WarehouseInput) {
+  await requirePermission('manage_warehouses')
   const sb = createAdminClient()
   const { error } = await sb
     .from('warehouses')
@@ -43,6 +46,7 @@ export async function updateWarehouse(id: string, input: WarehouseInput) {
 }
 
 export async function archiveWarehouse(id: string) {
+  await requirePermission('manage_warehouses')
   const sb = createAdminClient()
 
   const { data: activeLocations } = await sb
@@ -68,6 +72,7 @@ export async function archiveWarehouse(id: string) {
 }
 
 export async function restoreWarehouse(id: string) {
+  await requirePermission('manage_warehouses')
   const sb = createAdminClient()
   const { error } = await sb
     .from('warehouses')

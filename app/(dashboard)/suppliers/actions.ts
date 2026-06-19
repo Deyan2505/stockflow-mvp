@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { requirePermission } from '@/lib/current-user'
 
 const CO = process.env.DEMO_COMPANY_ID!
 
@@ -30,6 +31,7 @@ export type SupplierResult = { success: true } | { success: false; error: string
 
 export async function createSupplier(input: SupplierInput): Promise<SupplierResult> {
   try {
+    await requirePermission('manage_suppliers')
     const sb = createAdminClient()
     const { error } = await sb.from('suppliers').insert({
       company_id: CO,
@@ -50,6 +52,7 @@ export async function createSupplier(input: SupplierInput): Promise<SupplierResu
 
 export async function updateSupplier(id: string, input: SupplierInput): Promise<SupplierResult> {
   try {
+    await requirePermission('manage_suppliers')
     const sb = createAdminClient()
     const { error } = await sb
       .from('suppliers')
@@ -72,6 +75,7 @@ export async function updateSupplier(id: string, input: SupplierInput): Promise<
 
 export async function deactivateSupplier(id: string): Promise<SupplierResult> {
   try {
+    await requirePermission('manage_suppliers')
     const sb = createAdminClient()
     const { error } = await sb
       .from('suppliers')
@@ -88,6 +92,7 @@ export async function deactivateSupplier(id: string): Promise<SupplierResult> {
 
 export async function restoreSupplier(id: string): Promise<SupplierResult> {
   try {
+    await requirePermission('manage_suppliers')
     const sb = createAdminClient()
     const { error } = await sb
       .from('suppliers')

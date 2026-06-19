@@ -2,6 +2,7 @@
 
 import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
+import { requirePermission } from '@/lib/current-user'
 
 const CO = process.env.DEMO_COMPANY_ID!
 
@@ -30,6 +31,7 @@ export type LocationInput = {
 }
 
 export async function createLocation(input: LocationInput) {
+  await requirePermission('manage_locations')
   const sb = createAdminClient()
   const { error } = await sb
     .from('locations')
@@ -44,6 +46,7 @@ export async function createLocation(input: LocationInput) {
 }
 
 export async function updateLocation(id: string, input: LocationInput) {
+  await requirePermission('manage_locations')
   const sb = createAdminClient()
   const { error } = await sb
     .from('locations')
@@ -60,6 +63,7 @@ export async function updateLocation(id: string, input: LocationInput) {
 }
 
 export async function archiveLocation(id: string) {
+  await requirePermission('manage_locations')
   const sb = createAdminClient()
 
   const { data: stock } = await sb
@@ -86,6 +90,7 @@ export async function archiveLocation(id: string) {
 }
 
 export async function restoreLocation(id: string) {
+  await requirePermission('manage_locations')
   const sb = createAdminClient()
   const { error } = await sb
     .from('locations')
