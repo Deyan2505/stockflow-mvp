@@ -7,7 +7,7 @@ import { SupplierModal } from './supplier-modal'
 import { cn } from '@/lib/utils'
 import { useT } from '@/lib/i18n'
 
-export function SuppliersClient({ suppliers }: { suppliers: Supplier[] }) {
+export function SuppliersClient({ suppliers, canWrite }: { suppliers: Supplier[]; canWrite: boolean }) {
   const { t } = useT()
   const s = t.suppliers
 
@@ -56,12 +56,18 @@ export function SuppliersClient({ suppliers }: { suppliers: Supplier[] }) {
             {s.activeCount(suppliers.filter((x) => x.status === 'active').length)}
           </p>
         </div>
-        <button
-          onClick={() => setModal('new')}
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-        >
-          {s.newBtn}
-        </button>
+        {canWrite ? (
+          <button
+            onClick={() => setModal('new')}
+            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          >
+            {s.newBtn}
+          </button>
+        ) : (
+          <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">
+            {t.common.readOnly}
+          </span>
+        )}
       </div>
 
       {successMsg && (
@@ -140,31 +146,33 @@ export function SuppliersClient({ suppliers }: { suppliers: Supplier[] }) {
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={() => setModal(item)}
-                        className="text-xs text-blue-600 hover:underline dark:text-blue-400"
-                      >
-                        {s.edit}
-                      </button>
-                      {item.status === 'active' ? (
+                    {canWrite && (
+                      <div className="flex items-center gap-3">
                         <button
-                          onClick={() => handleAction(deactivateSupplier(item.id), s.successDeactivate)}
-                          disabled={isPending}
-                          className="text-xs text-gray-400 hover:text-red-500 disabled:opacity-50 dark:hover:text-red-400"
+                          onClick={() => setModal(item)}
+                          className="text-xs text-blue-600 hover:underline dark:text-blue-400"
                         >
-                          {s.deactivate}
+                          {s.edit}
                         </button>
-                      ) : (
-                        <button
-                          onClick={() => handleAction(restoreSupplier(item.id), s.successRestore)}
-                          disabled={isPending}
-                          className="text-xs text-gray-400 hover:text-green-600 disabled:opacity-50 dark:hover:text-green-400"
-                        >
-                          {s.restore}
-                        </button>
-                      )}
-                    </div>
+                        {item.status === 'active' ? (
+                          <button
+                            onClick={() => handleAction(deactivateSupplier(item.id), s.successDeactivate)}
+                            disabled={isPending}
+                            className="text-xs text-gray-400 hover:text-red-500 disabled:opacity-50 dark:hover:text-red-400"
+                          >
+                            {s.deactivate}
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleAction(restoreSupplier(item.id), s.successRestore)}
+                            disabled={isPending}
+                            className="text-xs text-gray-400 hover:text-green-600 disabled:opacity-50 dark:hover:text-green-400"
+                          >
+                            {s.restore}
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))
@@ -173,7 +181,7 @@ export function SuppliersClient({ suppliers }: { suppliers: Supplier[] }) {
         </table>
       </div>
 
-      {modal !== null && (
+      {canWrite && modal !== null && (
         <SupplierModal
           supplier={modal === 'new' ? null : modal}
           onClose={handleModalClose}

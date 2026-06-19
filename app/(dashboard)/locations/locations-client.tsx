@@ -11,9 +11,10 @@ import { useT } from '@/lib/i18n'
 type Props = {
   locations: Location[]
   warehouses: Warehouse[]
+  canWrite: boolean
 }
 
-export function LocationsClient({ locations, warehouses }: Props) {
+export function LocationsClient({ locations, warehouses, canWrite }: Props) {
   const { t } = useT()
   const l = t.locations
 
@@ -47,12 +48,18 @@ export function LocationsClient({ locations, warehouses }: Props) {
             {l.activeCount(locations.filter((x) => x.status === 'active').length)}
           </p>
         </div>
-        <button
-          onClick={() => setModal('new')}
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-        >
-          {l.newBtn}
-        </button>
+        {canWrite ? (
+          <button
+            onClick={() => setModal('new')}
+            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          >
+            {l.newBtn}
+          </button>
+        ) : (
+          <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">
+            {t.common.readOnly}
+          </span>
+        )}
       </div>
 
       {actionError && (
@@ -131,14 +138,16 @@ export function LocationsClient({ locations, warehouses }: Props) {
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <button onClick={() => setModal(loc)} className="text-xs text-blue-600 hover:underline dark:text-blue-400">{l.edit}</button>
-                      {loc.status === 'active' ? (
-                        <button onClick={() => startTransition(async () => { try { await archiveLocation(loc.id) } catch (err) { setActionError(err instanceof Error ? err.message : 'Error') } })} disabled={isPending} className="text-xs text-gray-400 hover:text-red-500 disabled:opacity-50 dark:hover:text-red-400">{l.deactivate}</button>
-                      ) : (
-                        <button onClick={() => startTransition(() => restoreLocation(loc.id))} disabled={isPending} className="text-xs text-gray-400 hover:text-green-600 disabled:opacity-50 dark:hover:text-green-400">{l.restore}</button>
-                      )}
-                    </div>
+                    {canWrite && (
+                      <div className="flex items-center gap-3">
+                        <button onClick={() => setModal(loc)} className="text-xs text-blue-600 hover:underline dark:text-blue-400">{l.edit}</button>
+                        {loc.status === 'active' ? (
+                          <button onClick={() => startTransition(async () => { try { await archiveLocation(loc.id) } catch (err) { setActionError(err instanceof Error ? err.message : 'Error') } })} disabled={isPending} className="text-xs text-gray-400 hover:text-red-500 disabled:opacity-50 dark:hover:text-red-400">{l.deactivate}</button>
+                        ) : (
+                          <button onClick={() => startTransition(() => restoreLocation(loc.id))} disabled={isPending} className="text-xs text-gray-400 hover:text-green-600 disabled:opacity-50 dark:hover:text-green-400">{l.restore}</button>
+                        )}
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))
@@ -147,7 +156,7 @@ export function LocationsClient({ locations, warehouses }: Props) {
         </table>
       </div>
 
-      {modal !== null && (
+      {canWrite && modal !== null && (
         <LocationModal
           location={modal === 'new' ? null : modal}
           warehouses={warehouses.filter((w) => w.status === 'active')}

@@ -7,7 +7,7 @@ import { ProductModal } from './product-modal'
 import { cn } from '@/lib/utils'
 import { useT } from '@/lib/i18n'
 
-export function ProductsClient({ products }: { products: Product[] }) {
+export function ProductsClient({ products, canWrite }: { products: Product[]; canWrite: boolean }) {
   const { t } = useT()
   const p = t.products
 
@@ -38,12 +38,18 @@ export function ProductsClient({ products }: { products: Product[] }) {
             {p.activeCount(products.filter((x) => x.status === 'active').length)}
           </p>
         </div>
-        <button
-          onClick={() => setModalProduct('new')}
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-        >
-          {p.newBtn}
-        </button>
+        {canWrite ? (
+          <button
+            onClick={() => setModalProduct('new')}
+            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          >
+            {p.newBtn}
+          </button>
+        ) : (
+          <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">
+            {t.common.readOnly}
+          </span>
+        )}
       </div>
 
       <div className="mb-4 flex items-center gap-3">
@@ -101,14 +107,16 @@ export function ProductsClient({ products }: { products: Product[] }) {
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <button onClick={() => setModalProduct(item)} className="text-xs text-blue-600 hover:underline dark:text-blue-400">{p.edit}</button>
-                      {item.status === 'active' ? (
-                        <button onClick={() => startTransition(() => archiveProduct(item.id))} disabled={isPending} className="text-xs text-gray-400 hover:text-red-500 disabled:opacity-50 dark:hover:text-red-400">{p.archive}</button>
-                      ) : (
-                        <button onClick={() => startTransition(() => restoreProduct(item.id))} disabled={isPending} className="text-xs text-gray-400 hover:text-green-600 disabled:opacity-50 dark:hover:text-green-400">{p.restore}</button>
-                      )}
-                    </div>
+                    {canWrite && (
+                      <div className="flex items-center gap-3">
+                        <button onClick={() => setModalProduct(item)} className="text-xs text-blue-600 hover:underline dark:text-blue-400">{p.edit}</button>
+                        {item.status === 'active' ? (
+                          <button onClick={() => startTransition(() => archiveProduct(item.id))} disabled={isPending} className="text-xs text-gray-400 hover:text-red-500 disabled:opacity-50 dark:hover:text-red-400">{p.archive}</button>
+                        ) : (
+                          <button onClick={() => startTransition(() => restoreProduct(item.id))} disabled={isPending} className="text-xs text-gray-400 hover:text-green-600 disabled:opacity-50 dark:hover:text-green-400">{p.restore}</button>
+                        )}
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))
@@ -117,7 +125,7 @@ export function ProductsClient({ products }: { products: Product[] }) {
         </table>
       </div>
 
-      {modalProduct !== null && (
+      {canWrite && modalProduct !== null && (
         <ProductModal product={modalProduct === 'new' ? null : modalProduct} onClose={() => setModalProduct(null)} />
       )}
     </div>

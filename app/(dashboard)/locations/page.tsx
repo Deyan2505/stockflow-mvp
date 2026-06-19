@@ -4,8 +4,11 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { LocationsClient } from './locations-client'
 import { type Location } from './actions'
 import { type Warehouse } from '../warehouses/actions'
+import { getCurrentRole } from '@/lib/current-user'
+import { can } from '@/lib/permissions'
 
 export default async function LocationsPage() {
+  const canWrite = can(getCurrentRole(), 'manage_locations')
   const sb = createAdminClient()
   const co = process.env.DEMO_COMPANY_ID!
 
@@ -36,6 +39,7 @@ export default async function LocationsPage() {
     <LocationsClient
       locations={(locations as Location[]) ?? []}
       warehouses={(warehouses as Warehouse[]) ?? []}
+      canWrite={canWrite}
     />
   )
 }

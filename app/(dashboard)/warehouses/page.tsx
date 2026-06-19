@@ -3,8 +3,11 @@ export const dynamic = 'force-dynamic'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { WarehousesClient } from './warehouses-client'
 import { type Warehouse } from './actions'
+import { getCurrentRole } from '@/lib/current-user'
+import { can } from '@/lib/permissions'
 
 export default async function WarehousesPage() {
+  const canWrite = can(getCurrentRole(), 'manage_warehouses')
   const sb = createAdminClient()
 
   const { data, error } = await sb
@@ -21,5 +24,5 @@ export default async function WarehousesPage() {
     )
   }
 
-  return <WarehousesClient warehouses={(data as Warehouse[]) ?? []} />
+  return <WarehousesClient warehouses={(data as Warehouse[]) ?? []} canWrite={canWrite} />
 }

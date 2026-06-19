@@ -419,6 +419,9 @@ const dict = {
       colWarehouse: 'Склад', colLocation: 'Локация', colQty: 'Налично',
       noStock: 'Няма наличност за този продукт.',
     },
+    common: {
+      readOnly: 'Само за четене',
+    },
   },
 
   en: {
@@ -832,6 +835,9 @@ const dict = {
       stockTitle: 'Stock by location',
       colWarehouse: 'Warehouse', colLocation: 'Location', colQty: 'Available',
       noStock: 'No stock available for this product.',
+    },
+    common: {
+      readOnly: 'Read-only',
     },
   },
 } as const
