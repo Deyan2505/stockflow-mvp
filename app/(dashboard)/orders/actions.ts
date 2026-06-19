@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { findProductByBarcode } from '@/lib/barcode-utils'
 import { recordMovement } from '@/lib/movement-engine'
+import { requirePermission } from '@/lib/current-user'
 
 const CO = process.env.DEMO_COMPANY_ID!
 
@@ -237,6 +238,7 @@ export type IssueResult =
 
 export async function issueOrder(input: IssueOrderInput): Promise<IssueResult> {
   try {
+    await requirePermission('issue_stock')
     const sb = createAdminClient()
 
     // 1. Re-read order — guard against double-issue / cancelled / draft

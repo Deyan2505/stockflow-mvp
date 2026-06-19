@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { recordMovement, type MovementInput } from '@/lib/movement-engine'
 import { findProductByBarcode } from '@/lib/barcode-utils'
+import { requirePermission } from '@/lib/current-user'
 
 export type { MovementInput }
 
@@ -57,6 +58,7 @@ export async function findProductForMovement(barcode: string): Promise<ProductFo
 
 export async function submitMovement(input: MovementInput): Promise<MovementResult> {
   try {
+    await requirePermission('create_movement')
     await recordMovement(input)
     revalidatePath('/')
     revalidatePath('/movements')

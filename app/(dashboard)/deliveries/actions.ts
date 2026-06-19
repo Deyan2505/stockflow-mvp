@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { recordMovement } from '@/lib/movement-engine'
 import { findProductByBarcode } from '@/lib/barcode-utils'
+import { requirePermission } from '@/lib/current-user'
 
 const CO = process.env.DEMO_COMPANY_ID!
 
@@ -180,6 +181,7 @@ export type ReceiveResult =
 
 export async function receiveDelivery(input: ReceiveDeliveryInput): Promise<ReceiveResult> {
   try {
+    await requirePermission('receive_delivery')
     const sb = createAdminClient()
 
     // Guard: re-read delivery status from DB to prevent double-receive
