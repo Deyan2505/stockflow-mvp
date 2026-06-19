@@ -102,10 +102,9 @@ export function IssueModal({ order, locations, onClose }: Props) {
         {/* Header */}
         <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4 dark:border-gray-800">
           <div>
-            <h2 className="font-semibold text-gray-900 dark:text-white">{o.issueTitle}</h2>
+            <h2 className="font-semibold text-gray-900 dark:text-white">{o.issueTitle} #{order.order_number}</h2>
             <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-              #{order.order_number}
-              {order.customer_name ? ` · ${order.customer_name}` : ''}
+              {o.issueToCustomerLabel} <span className="font-semibold text-gray-700 dark:text-gray-300">{order.customer_name?.trim() || o.noCustomer}</span>
             </p>
           </div>
           <button
@@ -125,85 +124,90 @@ export function IssueModal({ order, locations, onClose }: Props) {
             ) : allDone ? (
               <p className="py-10 text-center text-sm text-gray-400 dark:text-gray-500">{o.issueAllDone}</p>
             ) : (
-              <div className="rounded-lg border border-gray-200 dark:border-gray-700">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-gray-200 dark:border-gray-700">
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-400">
-                        {o.itemColProduct}
-                      </th>
-                      <th className="w-12 px-3 py-2 text-left text-xs font-medium text-gray-400">
-                        {o.issueColUnit}
-                      </th>
-                      <th className="w-20 px-3 py-2 text-right text-xs font-medium text-gray-400">
-                        {o.issueColOrdered}
-                      </th>
-                      <th className="w-20 px-3 py-2 text-right text-xs font-medium text-gray-400">
-                        {o.issueColIssued}
-                      </th>
-                      <th className="w-24 px-3 py-2 text-right text-xs font-medium text-gray-400">
-                        {o.issueColToIssue}
-                      </th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-400">
-                        {o.issueColFromLoc}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                    {rows.map((row, idx) => {
-                      const isDone = row.remaining === 0
-                      return (
-                        <tr key={row.item_id} className={isDone ? 'opacity-40' : ''}>
-                          <td className="px-3 py-2 font-medium text-gray-900 dark:text-white">
-                            {row.product_name}
-                          </td>
-                          <td className="px-3 py-2 text-xs text-gray-400 dark:text-gray-500">
-                            {row.unit}
-                          </td>
-                          <td className="px-3 py-2 text-right tabular-nums text-gray-500 dark:text-gray-400">
-                            {row.ordered}
-                          </td>
-                          <td className="px-3 py-2 text-right tabular-nums">
-                            {row.already_issued > 0 ? (
-                              <span className="font-medium text-amber-600 dark:text-amber-400">
-                                {row.already_issued}
-                              </span>
-                            ) : (
-                              <span className="text-gray-400">0</span>
-                            )}
-                          </td>
-                          <td className="px-3 py-2 text-right tabular-nums">
-                            {isDone ? (
-                              <span className="text-gray-400">—</span>
-                            ) : (
-                              <span className="font-semibold text-orange-600 dark:text-orange-400">
-                                {row.remaining}
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-3 py-2">
-                            {isDone ? (
-                              <span className="text-xs text-gray-400">—</span>
-                            ) : (
-                              <select
-                                value={row.from_location_id}
-                                onChange={(e) => setRowLocation(idx, e.target.value)}
-                                className={cellCls}
-                              >
-                                <option value="">—</option>
-                                {locations.map((l) => (
-                                  <option key={l.id} value={l.id}>
-                                    {l.warehouses?.name ? `${l.warehouses.name} / ${l.code}` : l.code}
-                                  </option>
-                                ))}
-                              </select>
-                            )}
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
+              <div>
+                <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
+                  {o.issueLocationHelper}
+                </p>
+                <div className="rounded-lg border border-gray-200 dark:border-gray-700">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-200 dark:border-gray-700">
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-400">
+                          {o.itemColProduct}
+                        </th>
+                        <th className="w-12 px-3 py-2 text-left text-xs font-medium text-gray-400">
+                          {o.issueColUnit}
+                        </th>
+                        <th className="w-20 px-3 py-2 text-right text-xs font-medium text-gray-400">
+                          {o.issueColOrdered}
+                        </th>
+                        <th className="w-20 px-3 py-2 text-right text-xs font-medium text-gray-400">
+                          {o.issueColIssued}
+                        </th>
+                        <th className="w-24 px-3 py-2 text-right text-xs font-medium text-gray-400">
+                          {o.issueColToIssue}
+                        </th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-400">
+                          {o.issueColFromLoc}
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                      {rows.map((row, idx) => {
+                        const isDone = row.remaining === 0
+                        return (
+                          <tr key={row.item_id} className={isDone ? 'opacity-40' : ''}>
+                            <td className="px-3 py-2 font-medium text-gray-900 dark:text-white">
+                              {row.product_name}
+                            </td>
+                            <td className="px-3 py-2 text-xs text-gray-400 dark:text-gray-500">
+                              {row.unit}
+                            </td>
+                            <td className="px-3 py-2 text-right tabular-nums text-gray-500 dark:text-gray-400">
+                              {row.ordered}
+                            </td>
+                            <td className="px-3 py-2 text-right tabular-nums">
+                              {row.already_issued > 0 ? (
+                                <span className="font-medium text-amber-600 dark:text-amber-400">
+                                  {row.already_issued}
+                                </span>
+                              ) : (
+                                <span className="text-gray-400">0</span>
+                              )}
+                            </td>
+                            <td className="px-3 py-2 text-right tabular-nums">
+                              {isDone ? (
+                                <span className="text-gray-400">—</span>
+                              ) : (
+                                <span className="font-semibold text-orange-600 dark:text-orange-400">
+                                  {row.remaining}
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-3 py-2">
+                              {isDone ? (
+                                <span className="text-xs text-gray-400">—</span>
+                              ) : (
+                                <select
+                                  value={row.from_location_id}
+                                  onChange={(e) => setRowLocation(idx, e.target.value)}
+                                  className={cellCls}
+                                >
+                                  <option value="">—</option>
+                                  {locations.map((l) => (
+                                    <option key={l.id} value={l.id}>
+                                      {l.warehouses?.name ? `${l.warehouses.name} / ${l.code}` : l.code}
+                                    </option>
+                                  ))}
+                                </select>
+                              )}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
           </div>

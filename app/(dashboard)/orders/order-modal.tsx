@@ -47,6 +47,7 @@ export function OrderModal({ order, onClose }: Props) {
 
   const validate = (): string | null => {
     if (!form.order_number.trim()) return o.errNumber
+    if (!form.customer_name.trim()) return o.errCustomerRequired
     return null
   }
 
@@ -58,7 +59,7 @@ export function OrderModal({ order, onClose }: Props) {
 
     const input: OrderInput = {
       order_number:  form.order_number,
-      customer_name: form.customer_name || null,
+      customer_name: form.customer_name.trim(),
       status:        form.status,
       order_date:    form.order_date || null,
       expected_date: form.expected_date || null,
@@ -114,7 +115,9 @@ export function OrderModal({ order, onClose }: Props) {
               </div>
 
               <div className="col-span-2">
-                <label className={labelCls}>{o.fCustomer}</label>
+                <label className={labelCls}>
+                  {o.fCustomer} <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="text"
                   value={form.customer_name}

@@ -167,7 +167,7 @@ export function OrderDetailModal({ order, products, onClose, onEditHeader, onIss
         <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4 dark:border-gray-800">
           <div>
             <h2 className="font-semibold text-gray-900 dark:text-white">{order.order_number}</h2>
-            <p className="mt-0.5 text-xs text-gray-400">{order.customer_name ?? o.noCustomer}</p>
+            <p className="mt-0.5 text-xs text-gray-400">{order.customer_name?.trim() || o.noCustomer}</p>
           </div>
           <div className="flex items-center gap-3">
             <span

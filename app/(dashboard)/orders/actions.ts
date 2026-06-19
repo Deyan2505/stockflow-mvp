@@ -62,12 +62,16 @@ export async function createOrder(input: OrderInput): Promise<OrderResult> {
   try {
     const sb = createAdminClient()
 
+    if (!input.customer_name?.trim()) {
+      throw new Error('Името на клиента е задължително')
+    }
+
     const { error } = await sb
       .from('outgoing_orders')
       .insert({
         company_id:    CO,
         order_number:  input.order_number.trim(),
-        customer_name: input.customer_name || null,
+        customer_name: input.customer_name.trim(),
         status:        input.status,
         order_date:    input.order_date || null,
         expected_date: input.expected_date || null,
@@ -90,11 +94,15 @@ export async function updateOrder(id: string, input: OrderInput): Promise<OrderR
   try {
     const sb = createAdminClient()
 
+    if (!input.customer_name?.trim()) {
+      throw new Error('Името на клиента е задължително')
+    }
+
     const { error } = await sb
       .from('outgoing_orders')
       .update({
         order_number:  input.order_number.trim(),
-        customer_name: input.customer_name || null,
+        customer_name: input.customer_name.trim(),
         status:        input.status,
         order_date:    input.order_date || null,
         expected_date: input.expected_date || null,
@@ -244,7 +252,7 @@ export async function issueOrder(input: IssueOrderInput): Promise<IssueResult> {
     // 1. Re-read order — guard against double-issue / cancelled / draft
     const { data: order } = await sb
       .from('outgoing_orders')
-      .select('id, status, order_number')
+      .select('id, status, order_number, customer_name')
       .eq('id', input.order_id)
       .eq('company_id', CO)
       .single()
@@ -315,7 +323,9 @@ export async function issueOrder(input: IssueOrderInput): Promise<IssueResult> {
         from_location_id: item.from_location_id,
         to_location_id:   null,
         quantity:         item.qty,
-        note:             `Изписване по поръчка #${order.order_number}`,
+        note:             order.customer_name
+          ? `Изписване по поръчка #${order.order_number} (Клиент: ${order.customer_name})`
+          : `Изписване по поръчка #${order.order_number}`,
         reference_type:   'outgoing_order',
         reference_id:     order.id,
       })

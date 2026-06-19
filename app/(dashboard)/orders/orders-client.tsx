@@ -177,7 +177,7 @@ export function OrdersClient({ orders, products, locations }: Props) {
                     {item.order_number}
                   </td>
                   <td className="px-4 py-3 text-gray-500 dark:text-gray-400">
-                    {item.customer_name ?? '—'}
+                    {item.customer_name?.trim() || o.noCustomer}
                   </td>
                   <td className="px-4 py-3">{statusBadge(item.status)}</td>
                   <td className="px-4 py-3 text-gray-500 dark:text-gray-400">
