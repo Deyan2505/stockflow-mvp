@@ -9,7 +9,9 @@ import { can } from '@/lib/permissions'
 const CO = process.env.DEMO_COMPANY_ID!
 
 export default async function DeliveriesPage() {
-  const canReceive = can(await getCurrentRole(), 'receive_delivery')
+  const role = await getCurrentRole()
+  const canReceive = can(role, 'receive_delivery')
+  const canManage = can(role, 'manage_deliveries')
   const sb = createAdminClient()
 
   const [deliveriesRes, suppliersRes, productsRes, locationsRes, movementsRes] = await Promise.all([
@@ -45,6 +47,7 @@ export default async function DeliveriesPage() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       deliveryMovements={deliveryMovements as any[]}
       canReceive={canReceive}
+      canManage={canManage}
     />
   )
 }

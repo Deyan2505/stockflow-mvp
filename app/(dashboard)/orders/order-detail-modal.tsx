@@ -25,6 +25,7 @@ type Props = {
   onClose: () => void
   onEditHeader: () => void
   onIssueStock?: () => void
+  canManage?: boolean
 }
 
 const statusColor: Record<string, string> = {
@@ -34,7 +35,7 @@ const statusColor: Record<string, string> = {
   cancelled: 'bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400',
 }
 
-export function OrderDetailModal({ order, products, onClose, onEditHeader, onIssueStock }: Props) {
+export function OrderDetailModal({ order, products, onClose, onEditHeader, onIssueStock, canManage }: Props) {
   const { t } = useT()
   const o = t.orders
 
@@ -188,7 +189,7 @@ export function OrderDetailModal({ order, products, onClose, onEditHeader, onIss
                 {o.issueStockBtn}
               </button>
             )}
-            {canEdit && (
+            {canManage !== false && canEdit && (
               <button
                 onClick={onEditHeader}
                 className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
@@ -269,7 +270,7 @@ export function OrderDetailModal({ order, products, onClose, onEditHeader, onIss
                     <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-gray-400">
                       {o.itemColUnit}
                     </th>
-                    {canEdit && <th className="px-4 py-2" />}
+                    {canManage !== false && canEdit && <th className="px-4 py-2" />}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
@@ -308,7 +309,7 @@ export function OrderDetailModal({ order, products, onClose, onEditHeader, onIss
                       <td className="px-4 py-2 text-gray-500 dark:text-gray-400">
                         {item.products?.unit ?? '—'}
                       </td>
-                      {canEdit && (
+                      {canManage !== false && canEdit && (
                         <td className="px-4 py-2">
                           <div className="flex items-center justify-end gap-3">
                             {editItemId === item.id ? (
@@ -361,7 +362,7 @@ export function OrderDetailModal({ order, products, onClose, onEditHeader, onIss
           )}
 
           {/* ── Add item form ──────────────────────────────────────────────── */}
-          {canEdit && (
+          {canManage !== false && canEdit && (
             <div>
               <p className="mb-2 text-xs font-medium text-gray-500 dark:text-gray-400">
                 {o.itemAddTitle}

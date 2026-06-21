@@ -14,9 +14,10 @@ type Props = {
   products: Product[]
   locations: Location[]
   canIssue: boolean
+  canManage: boolean
 }
 
-export function OrdersClient({ orders, products, locations, canIssue }: Props) {
+export function OrdersClient({ orders, products, locations, canIssue, canManage }: Props) {
   const { t } = useT()
   const o = t.orders
 
@@ -96,12 +97,14 @@ export function OrdersClient({ orders, products, locations, canIssue }: Props) {
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">{o.title}</h1>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{o.subtitle}</p>
         </div>
-        <button
-          onClick={() => setModal('new')}
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-        >
-          {o.newBtn}
-        </button>
+        {canManage && (
+          <button
+            onClick={() => setModal('new')}
+            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          >
+            {o.newBtn}
+          </button>
+        )}
       </div>
 
       {/* Banners */}
@@ -203,7 +206,7 @@ export function OrdersClient({ orders, products, locations, canIssue }: Props) {
                           {o.issueStockBtn}
                         </button>
                       )}
-                      {canEdit(item.status) && (
+                      {canManage && canEdit(item.status) && (
                         <button
                           onClick={() => setModal(item)}
                           className="text-xs text-blue-600 hover:underline dark:text-blue-400"
@@ -211,7 +214,7 @@ export function OrdersClient({ orders, products, locations, canIssue }: Props) {
                           {o.edit}
                         </button>
                       )}
-                      {canEdit(item.status) && (
+                      {canManage && canEdit(item.status) && (
                         <button
                           onClick={() => handleCancel(item.id)}
                           disabled={isPending}
@@ -229,7 +232,7 @@ export function OrdersClient({ orders, products, locations, canIssue }: Props) {
         </table>
       </div>
 
-      {modal !== null && (
+      {canManage && modal !== null && (
         <OrderModal
           order={modal === 'new' ? null : modal}
           onClose={handleModalClose}
@@ -251,6 +254,7 @@ export function OrdersClient({ orders, products, locations, canIssue }: Props) {
             setDetailOrder(null)
             setIssueModalOrder(ord)
           } : undefined}
+          canManage={canManage}
         />
       )}
 

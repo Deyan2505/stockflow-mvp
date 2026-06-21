@@ -9,7 +9,9 @@ import { can } from '@/lib/permissions'
 const CO = process.env.DEMO_COMPANY_ID!
 
 export default async function OrdersPage() {
-  const canIssue = can(await getCurrentRole(), 'issue_stock')
+  const role = await getCurrentRole()
+  const canIssue = can(role, 'issue_stock')
+  const canManage = can(role, 'manage_orders')
   const sb = createAdminClient()
 
   const [{ data: orders }, { data: products }, { data: locations }] = await Promise.all([
@@ -38,6 +40,7 @@ export default async function OrdersPage() {
       products={(products ?? []) as unknown as Product[]}
       locations={(locations ?? []) as unknown as Location[]}
       canIssue={canIssue}
+      canManage={canManage}
     />
   )
 }

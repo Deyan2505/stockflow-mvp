@@ -58,6 +58,7 @@ export type DeliveryResult = { success: true } | { success: false; error: string
 
 export async function createDelivery(input: DeliveryInput): Promise<DeliveryResult> {
   try {
+    await requirePermission('manage_deliveries')
     const sb = createAdminClient()
 
     const { data: delivery, error: delErr } = await sb
@@ -100,6 +101,7 @@ export async function createDelivery(input: DeliveryInput): Promise<DeliveryResu
 
 export async function updateDelivery(id: string, input: DeliveryInput): Promise<DeliveryResult> {
   try {
+    await requirePermission('manage_deliveries')
     const sb = createAdminClient()
 
     const { error: delErr } = await sb
@@ -146,6 +148,7 @@ export async function updateDelivery(id: string, input: DeliveryInput): Promise<
 
 export async function cancelDelivery(id: string): Promise<DeliveryResult> {
   try {
+    await requirePermission('manage_deliveries')
     const sb = createAdminClient()
     const { error } = await sb
       .from('incoming_deliveries')

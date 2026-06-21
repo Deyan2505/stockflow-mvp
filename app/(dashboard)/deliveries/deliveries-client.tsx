@@ -16,9 +16,10 @@ type Props = {
   locations: { id: string; code: string }[]
   deliveryMovements: DeliveryMovement[]
   canReceive: boolean
+  canManage: boolean
 }
 
-export function DeliveriesClient({ deliveries, suppliers, products, locations, deliveryMovements, canReceive }: Props) {
+export function DeliveriesClient({ deliveries, suppliers, products, locations, deliveryMovements, canReceive, canManage }: Props) {
   const { t } = useT()
   const d = t.deliveries
 
@@ -112,12 +113,14 @@ export function DeliveriesClient({ deliveries, suppliers, products, locations, d
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">{d.title}</h1>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{d.subtitle}</p>
         </div>
-        <button
-          onClick={() => setModal('new')}
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-        >
-          {d.newBtn}
-        </button>
+        {canManage && (
+          <button
+            onClick={() => setModal('new')}
+            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          >
+            {d.newBtn}
+          </button>
+        )}
       </div>
 
       {/* Banners */}
@@ -223,8 +226,8 @@ export function DeliveriesClient({ deliveries, suppliers, products, locations, d
                         </button>
                       )}
 
-                      {/* Edit / Cancel: draft / expected only */}
-                      {canEdit(item.status) && (
+                      {/* Edit / Cancel: draft / expected only, and only for roles with manage_deliveries */}
+                      {canManage && canEdit(item.status) && (
                         <button
                           onClick={() => setModal(item)}
                           className="text-xs text-blue-600 hover:underline dark:text-blue-400"
@@ -232,7 +235,7 @@ export function DeliveriesClient({ deliveries, suppliers, products, locations, d
                           {d.edit}
                         </button>
                       )}
-                      {canEdit(item.status) && (
+                      {canManage && canEdit(item.status) && (
                         <button
                           onClick={() => handleCancel(item.id)}
                           disabled={isPending}
@@ -250,8 +253,8 @@ export function DeliveriesClient({ deliveries, suppliers, products, locations, d
         </table>
       </div>
 
-      {/* Edit / create modal */}
-      {modal !== null && (
+      {/* Edit / create modal — only for roles with manage_deliveries */}
+      {canManage && modal !== null && (
         <DeliveryModal
           delivery={modal === 'new' ? null : modal}
           suppliers={suppliers}

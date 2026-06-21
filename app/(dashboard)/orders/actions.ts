@@ -60,6 +60,7 @@ export type OrderItemResult = { success: true } | { success: false; error: strin
 
 export async function createOrder(input: OrderInput): Promise<OrderResult> {
   try {
+    await requirePermission('manage_orders')
     const sb = createAdminClient()
 
     if (!input.customer_name?.trim()) {
@@ -92,6 +93,7 @@ export async function createOrder(input: OrderInput): Promise<OrderResult> {
 
 export async function updateOrder(id: string, input: OrderInput): Promise<OrderResult> {
   try {
+    await requirePermission('manage_orders')
     const sb = createAdminClient()
 
     if (!input.customer_name?.trim()) {
@@ -125,6 +127,7 @@ export async function updateOrder(id: string, input: OrderInput): Promise<OrderR
 
 export async function cancelOrder(id: string): Promise<OrderResult> {
   try {
+    await requirePermission('manage_orders')
     const sb = createAdminClient()
     const { error } = await sb
       .from('outgoing_orders')
@@ -171,6 +174,7 @@ export async function addOrderItem(
 ): Promise<OrderItemResult> {
   if (quantity <= 0) return { success: false, error: 'Количеството трябва да е положително' }
   try {
+    await requirePermission('manage_orders')
     const sb = createAdminClient()
     const { error } = await sb
       .from('outgoing_order_items')
@@ -197,6 +201,7 @@ export async function updateOrderItem(
 ): Promise<OrderItemResult> {
   if (quantity <= 0) return { success: false, error: 'Количеството трябва да е положително' }
   try {
+    await requirePermission('manage_orders')
     const sb = createAdminClient()
     const { error } = await sb
       .from('outgoing_order_items')
@@ -212,6 +217,7 @@ export async function updateOrderItem(
 
 export async function removeOrderItem(itemId: string): Promise<OrderItemResult> {
   try {
+    await requirePermission('manage_orders')
     const sb = createAdminClient()
     const { error } = await sb
       .from('outgoing_order_items')
