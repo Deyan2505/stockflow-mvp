@@ -3,10 +3,12 @@ export const dynamic = 'force-dynamic'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { LowStockClient, type LowStockProduct } from './low-stock-client'
 import { DeliveryReportsClient, type DeliveryReport } from './delivery-reports-client'
+import { getCurrentRole } from '@/lib/current-user'
 
 const CO = process.env.DEMO_COMPANY_ID!
 
 export default async function ReportsPage() {
+  const canExport = (await getCurrentRole()) !== 'viewer'
   const sb = createAdminClient()
 
   const [
@@ -135,10 +137,12 @@ export default async function ReportsPage() {
       <LowStockClient
         items={lowStock}
         warehouses={(warehouses ?? []).map((w) => ({ id: w.id, name: w.name }))}
+        canExport={canExport}
       />
       <DeliveryReportsClient
         deliveries={deliveryReports}
         suppliers={(suppliers ?? []).map((s) => ({ id: s.id, name: s.name }))}
+        canExport={canExport}
       />
     </div>
   )

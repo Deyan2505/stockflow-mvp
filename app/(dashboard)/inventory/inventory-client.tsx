@@ -33,6 +33,7 @@ type Warehouse = { id: string; name: string }
 type Props = {
   rows: InventoryRow[]
   warehouses: Warehouse[]
+  canExport: boolean
 }
 
 type StockStatus = 'ok' | 'low' | 'zero'
@@ -72,7 +73,7 @@ const QTY_COLOR: Record<StockStatus, string> = {
   zero: 'text-red-500 dark:text-red-400',
 }
 
-export function InventoryClient({ rows, warehouses }: Props) {
+export function InventoryClient({ rows, warehouses, canExport }: Props) {
   const { t } = useT()
   const inv = t.inventory
 
@@ -356,24 +357,26 @@ export function InventoryClient({ rows, warehouses }: Props) {
 
       {/* Table */}
       <div className="rounded-xl border border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-900">
-        <div className="flex items-center justify-end gap-2 border-b border-gray-100 px-4 py-2 dark:border-gray-800">
-          <button
-            onClick={handleExport}
-            disabled={filtered.length === 0}
-            className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
-          >
-            <Download className="h-3.5 w-3.5" />
-            {inv.exportCsv}
-          </button>
-          <button
-            onClick={handleXlsxExport}
-            disabled={filtered.length === 0}
-            className="flex items-center gap-1.5 rounded-lg border border-green-200 bg-green-50 px-3 py-1.5 text-xs font-medium text-green-700 transition-colors hover:bg-green-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-green-900/40 dark:bg-green-900/20 dark:text-green-400 dark:hover:bg-green-900/30"
-          >
-            <Download className="h-3.5 w-3.5" />
-            {inv.exportXlsx}
-          </button>
-        </div>
+        {canExport && (
+          <div className="flex items-center justify-end gap-2 border-b border-gray-100 px-4 py-2 dark:border-gray-800">
+            <button
+              onClick={handleExport}
+              disabled={filtered.length === 0}
+              className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
+            >
+              <Download className="h-3.5 w-3.5" />
+              {inv.exportCsv}
+            </button>
+            <button
+              onClick={handleXlsxExport}
+              disabled={filtered.length === 0}
+              className="flex items-center gap-1.5 rounded-lg border border-green-200 bg-green-50 px-3 py-1.5 text-xs font-medium text-green-700 transition-colors hover:bg-green-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-green-900/40 dark:bg-green-900/20 dark:text-green-400 dark:hover:bg-green-900/30"
+            >
+              <Download className="h-3.5 w-3.5" />
+              {inv.exportXlsx}
+            </button>
+          </div>
+        )}
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-100 dark:border-gray-800">

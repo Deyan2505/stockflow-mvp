@@ -7,7 +7,9 @@ import { getCurrentRole } from '@/lib/current-user'
 import { can } from '@/lib/permissions'
 
 export default async function MovementsPage() {
-  const canWrite = can(await getCurrentRole(), 'create_movement')
+  const role = await getCurrentRole()
+  const canWrite = can(role, 'create_movement')
+  const canExport = role !== 'viewer'
   const sb = createAdminClient()
   const co = process.env.DEMO_COMPANY_ID!
 
@@ -189,6 +191,7 @@ export default async function MovementsPage() {
       suppliers={(dbSuppliers as SupplierOption[]) ?? []}
       customers={(dbCustomers as CustomerOption[]) ?? []}
       canWrite={canWrite}
+      canExport={canExport}
     />
   )
 }

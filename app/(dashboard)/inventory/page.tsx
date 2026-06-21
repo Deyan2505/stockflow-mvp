@@ -2,10 +2,13 @@ export const dynamic = 'force-dynamic'
 
 import { createAdminClient } from '@/lib/supabase/admin'
 import { InventoryClient } from './inventory-client'
+import { getCurrentRole } from '@/lib/current-user'
 
 const CO = process.env.DEMO_COMPANY_ID!
 
 export default async function InventoryPage() {
+  const role = await getCurrentRole()
+  const canExport = role !== 'viewer'
   const sb = createAdminClient()
 
   const [{ data: rows, error: errRows }, { data: warehouses, error: errWarehouses }] =
@@ -36,5 +39,5 @@ export default async function InventoryPage() {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return <InventoryClient rows={(rows as any[]) ?? []} warehouses={warehouses ?? []} />
+  return <InventoryClient rows={(rows as any[]) ?? []} warehouses={warehouses ?? []} canExport={canExport} />
 }

@@ -26,6 +26,7 @@ type Supplier = { id: string; name: string }
 type Props = {
   deliveries: DeliveryReport[]
   suppliers: Supplier[]
+  canExport: boolean
 }
 
 type Filters = {
@@ -57,7 +58,7 @@ function formatDate(iso: string | null): string {
   return new Date(iso).toLocaleDateString('bg-BG', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
-export function DeliveryReportsClient({ deliveries, suppliers }: Props) {
+export function DeliveryReportsClient({ deliveries, suppliers, canExport }: Props) {
   const { t } = useT()
   const r = t.reports
 
@@ -214,24 +215,26 @@ export function DeliveryReportsClient({ deliveries, suppliers }: Props) {
             {r.deliveriesSub(deliveries.length)}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleExport}
-            disabled={filtered.length === 0}
-            className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
-          >
-            <Download className="h-3.5 w-3.5" />
-            {r.exportCsv}
-          </button>
-          <button
-            onClick={handleXlsxExport}
-            disabled={filtered.length === 0}
-            className="flex items-center gap-1.5 rounded-lg border border-green-200 bg-green-50 px-3 py-1.5 text-xs font-medium text-green-700 transition-colors hover:bg-green-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-green-900/40 dark:bg-green-900/20 dark:text-green-400 dark:hover:bg-green-900/30"
-          >
-            <Download className="h-3.5 w-3.5" />
-            {r.exportXlsx}
-          </button>
-        </div>
+        {canExport && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleExport}
+              disabled={filtered.length === 0}
+              className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
+            >
+              <Download className="h-3.5 w-3.5" />
+              {r.exportCsv}
+            </button>
+            <button
+              onClick={handleXlsxExport}
+              disabled={filtered.length === 0}
+              className="flex items-center gap-1.5 rounded-lg border border-green-200 bg-green-50 px-3 py-1.5 text-xs font-medium text-green-700 transition-colors hover:bg-green-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-green-900/40 dark:bg-green-900/20 dark:text-green-400 dark:hover:bg-green-900/30"
+            >
+              <Download className="h-3.5 w-3.5" />
+              {r.exportXlsx}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Summary cards */}

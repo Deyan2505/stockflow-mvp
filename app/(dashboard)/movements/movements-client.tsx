@@ -18,6 +18,7 @@ type Props = {
   suppliers: SupplierOption[]
   customers: CustomerOption[]
   canWrite: boolean
+  canExport: boolean
 }
 
 type Tab = 'IN' | 'OUT' | 'TRANSFER'
@@ -69,7 +70,7 @@ function hasActiveFilters(f: Filters): boolean {
   return !!(f.type || f.productId || f.warehouseId || f.dateFrom || f.dateTo || f.referenceType)
 }
 
-export function MovementsClient({ products, locations, movements, balances, suppliers, customers, canWrite }: Props) {
+export function MovementsClient({ products, locations, movements, balances, suppliers, customers, canWrite, canExport }: Props) {
   const { t } = useT()
   const m = t.movements
 
@@ -573,24 +574,26 @@ export function MovementsClient({ products, locations, movements, balances, supp
                   {active ? `${filteredMovements.length} / ${movements.length}` : `${movements.length}`} {m.records}
                 </span>
               </h2>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleExport}
-                  disabled={filteredMovements.length === 0}
-                  className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
-                >
-                  <Download className="h-3.5 w-3.5" />
-                  {m.exportCsv}
-                </button>
-                <button
-                  onClick={handleXlsxExport}
-                  disabled={filteredMovements.length === 0}
-                  className="flex items-center gap-1.5 rounded-lg border border-green-200 bg-green-50 px-3 py-1.5 text-xs font-medium text-green-700 transition-colors hover:bg-green-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-green-900/40 dark:bg-green-900/20 dark:text-green-400 dark:hover:bg-green-900/30"
-                >
-                  <Download className="h-3.5 w-3.5" />
-                  {m.exportXlsx}
-                </button>
-              </div>
+              {canExport && (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleExport}
+                    disabled={filteredMovements.length === 0}
+                    className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    {m.exportCsv}
+                  </button>
+                  <button
+                    onClick={handleXlsxExport}
+                    disabled={filteredMovements.length === 0}
+                    className="flex items-center gap-1.5 rounded-lg border border-green-200 bg-green-50 px-3 py-1.5 text-xs font-medium text-green-700 transition-colors hover:bg-green-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-green-900/40 dark:bg-green-900/20 dark:text-green-400 dark:hover:bg-green-900/30"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    {m.exportXlsx}
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Filter bar */}
