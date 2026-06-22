@@ -4,11 +4,13 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { LowStockClient, type LowStockProduct } from './low-stock-client'
 import { DeliveryReportsClient, type DeliveryReport } from './delivery-reports-client'
 import { getCurrentRole } from '@/lib/current-user'
+import { can } from '@/lib/permissions'
 
 const CO = process.env.DEMO_COMPANY_ID!
 
 export default async function ReportsPage() {
-  const canExport = (await getCurrentRole()) !== 'viewer'
+  const role = await getCurrentRole()
+  const canExport = can(role, 'export_reports')
   const sb = createAdminClient()
 
   const [

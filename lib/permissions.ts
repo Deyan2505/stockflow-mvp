@@ -19,6 +19,7 @@ export type Permission =
   | 'manage_deliveries'
   | 'manage_orders'
   | 'issue_stock'
+  | 'export_reports'
   // Admin
   | 'manage_users'
   | 'manage_company_settings';
@@ -44,7 +45,8 @@ export const OPERATIONAL_PERMISSIONS: Permission[] = [
   'receive_delivery',
   'manage_deliveries',
   'manage_orders',
-  'issue_stock'
+  'issue_stock',
+  'export_reports'
 ];
 
 export const ADMIN_PERMISSIONS: Permission[] = [
