@@ -2,8 +2,9 @@
 
 import { useState, useTransition, useMemo } from 'react'
 import { Search } from 'lucide-react'
-import { type Invoice, type InvoiceResult, type CustomerOption, cancelInvoice } from './actions'
+import { type Invoice, type InvoiceResult, type CustomerOption, type ProductForInvoice, cancelInvoice } from './actions'
 import { InvoiceModal } from './invoice-modal'
+import { InvoiceDetailModal } from './invoice-detail-modal'
 import { cn } from '@/lib/utils'
 import { useT } from '@/lib/i18n'
 
@@ -14,10 +15,12 @@ const fmt = (d: string | null) => (d ? d.split('-').reverse().join('.') : '—')
 export function InvoicesClient({
   invoices,
   customers,
+  products,
   canManage,
 }: {
   invoices: Invoice[]
   customers: CustomerOption[]
+  products: ProductForInvoice[]
   canManage: boolean
 }) {
   const { t } = useT()
@@ -26,6 +29,7 @@ export function InvoicesClient({
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [modal, setModal] = useState<Invoice | null | 'new'>(null)
+  const [detailInvoice, setDetailInvoice] = useState<Invoice | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
@@ -207,23 +211,31 @@ export function InvoicesClient({
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    {canManage && canEditInvoice(item) && (
-                      <div className="flex items-center gap-3">
-                        <button
-                          onClick={() => setModal(item)}
-                          className="text-xs text-blue-600 hover:underline dark:text-blue-400"
-                        >
-                          {s.edit}
-                        </button>
-                        <button
-                          onClick={() => handleCancel(item.id)}
-                          disabled={isPending}
-                          className="text-xs text-gray-400 hover:text-red-500 disabled:opacity-50 dark:hover:text-red-400"
-                        >
-                          {s.cancelAction}
-                        </button>
-                      </div>
-                    )}
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => setDetailInvoice(item)}
+                        className="text-xs text-gray-500 hover:underline dark:text-gray-400"
+                      >
+                        {s.detail}
+                      </button>
+                      {canManage && canEditInvoice(item) && (
+                        <>
+                          <button
+                            onClick={() => setModal(item)}
+                            className="text-xs text-blue-600 hover:underline dark:text-blue-400"
+                          >
+                            {s.edit}
+                          </button>
+                          <button
+                            onClick={() => handleCancel(item.id)}
+                            disabled={isPending}
+                            className="text-xs text-gray-400 hover:text-red-500 disabled:opacity-50 dark:hover:text-red-400"
+                          >
+                            {s.cancelAction}
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))
@@ -237,6 +249,20 @@ export function InvoicesClient({
           invoice={modal === 'new' ? null : modal}
           customers={customers}
           onClose={handleModalClose}
+        />
+      )}
+
+      {detailInvoice !== null && (
+        <InvoiceDetailModal
+          invoice={detailInvoice}
+          products={products}
+          canManage={canManage}
+          onClose={() => setDetailInvoice(null)}
+          onEditHeader={() => {
+            const inv = detailInvoice
+            setDetailInvoice(null)
+            setModal(inv)
+          }}
         />
       )}
     </div>
