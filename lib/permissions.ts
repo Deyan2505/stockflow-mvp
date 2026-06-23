@@ -8,11 +8,13 @@ export type Permission =
   | 'view_movements'
   | 'view_reports'
   | 'scan_lookup'
+  | 'view_customers'
   // Master data
   | 'manage_products'
   | 'manage_warehouses'
   | 'manage_locations'
   | 'manage_suppliers'
+  | 'manage_customers'
   // Operational
   | 'create_movement'
   | 'receive_delivery'
@@ -30,14 +32,16 @@ export const READ_ONLY_PERMISSIONS: Permission[] = [
   'view_inventory',
   'view_movements',
   'view_reports',
-  'scan_lookup'
+  'scan_lookup',
+  'view_customers'
 ];
 
 export const MASTER_DATA_PERMISSIONS: Permission[] = [
   'manage_products',
   'manage_warehouses',
   'manage_locations',
-  'manage_suppliers'
+  'manage_suppliers',
+  'manage_customers'
 ];
 
 export const OPERATIONAL_PERMISSIONS: Permission[] = [
