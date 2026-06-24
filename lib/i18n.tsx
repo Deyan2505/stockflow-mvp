@@ -288,6 +288,11 @@ const dict = {
       vatLabel: (rate: number) => `ДДС ${rate}%`,
       vatAmountLabel: 'ДДС сума',
       totalLabel: 'Общо',
+      issueAction: 'Издай фактура',
+      issuing: 'Издаване…',
+      issueConfirm: 'Издаването ще заключи фактурата. След това няма да можеш да редактираш заглавната част или редовете. Сигурен ли си?',
+      successIssue: 'Фактурата е издадена успешно',
+      errIssueNoItems: 'Фактурата трябва да има поне един ред преди издаване',
     },
     deliveries: {
       title: 'Входящи доставки',
@@ -799,6 +804,11 @@ const dict = {
       vatLabel: (rate: number) => `VAT ${rate}%`,
       vatAmountLabel: 'VAT amount',
       totalLabel: 'Total',
+      issueAction: 'Issue invoice',
+      issuing: 'Issuing…',
+      issueConfirm: 'Issuing will lock this invoice. After that, you will not be able to edit the header or line items. Are you sure?',
+      successIssue: 'Invoice issued successfully',
+      errIssueNoItems: 'Invoice must have at least one line item before issuing',
     },
     deliveries: {
       title: 'Incoming Deliveries',

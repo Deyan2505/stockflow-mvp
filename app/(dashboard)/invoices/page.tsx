@@ -11,6 +11,7 @@ const CO = process.env.DEMO_COMPANY_ID!
 export default async function InvoicesPage() {
   const role = await getCurrentRole()
   const canManage = can(role, 'manage_invoices')
+  const canIssue = can(role, 'issue_invoice')
   const sb = createAdminClient()
 
   const [{ data: invoices }, { data: customers }, { data: products }] = await Promise.all([
@@ -39,6 +40,7 @@ export default async function InvoicesPage() {
       customers={(customers ?? []) as CustomerOption[]}
       products={(products ?? []) as ProductForInvoice[]}
       canManage={canManage}
+      canIssue={canIssue}
     />
   )
 }

@@ -17,11 +17,13 @@ export function InvoicesClient({
   customers,
   products,
   canManage,
+  canIssue,
 }: {
   invoices: Invoice[]
   customers: CustomerOption[]
   products: ProductForInvoice[]
   canManage: boolean
+  canIssue: boolean
 }) {
   const { t } = useT()
   const s = t.invoices
@@ -257,7 +259,14 @@ export function InvoicesClient({
           invoice={detailInvoice}
           products={products}
           canManage={canManage}
-          onClose={() => setDetailInvoice(null)}
+          canIssue={canIssue}
+          onClose={(msg) => {
+            setDetailInvoice(null)
+            if (msg) {
+              setSuccessMsg(msg)
+              setTimeout(() => setSuccessMsg(null), 3500)
+            }
+          }}
           onEditHeader={() => {
             const inv = detailInvoice
             setDetailInvoice(null)

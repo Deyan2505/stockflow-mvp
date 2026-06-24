@@ -225,6 +225,38 @@ export async function removeInvoiceItem(itemId: string): Promise<InvoiceItemResu
   }
 }
 
+export async function issueInvoice(id: string): Promise<InvoiceResult> {
+  try {
+    await requirePermission('issue_invoice')
+    const sb = createAdminClient()
+    const { data: inv } = await sb
+      .from('invoices')
+      .select('status, vat_rate')
+      .eq('id', id)
+      .eq('company_id', CO)
+      .single()
+    if (!inv) throw new Error('Фактурата не е намерена')
+    if (inv.status !== 'draft') throw new Error('errLocked')
+    const { data: items } = await sb
+      .from('invoice_items')
+      .select('id')
+      .eq('invoice_id', id)
+      .eq('company_id', CO)
+    if (!items || items.length === 0) throw new Error('errIssueNoItems')
+    await recalcInvoiceTotals(sb, id, Number(inv.vat_rate))
+    const { error } = await sb
+      .from('invoices')
+      .update({ status: 'issued' })
+      .eq('id', id)
+      .eq('company_id', CO)
+    if (error) throw new Error(error.message)
+    revalidatePath('/invoices')
+    return { success: true }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Грешка, опитай отново' }
+  }
+}
+
 export async function createInvoice(input: InvoiceInput): Promise<InvoiceResult> {
   try {
     await requirePermission('manage_invoices')

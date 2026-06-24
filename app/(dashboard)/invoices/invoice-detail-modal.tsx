@@ -10,6 +10,7 @@ import {
   addInvoiceItem,
   updateInvoiceItem,
   removeInvoiceItem,
+  issueInvoice,
 } from './actions'
 import { cn } from '@/lib/utils'
 import { useT } from '@/lib/i18n'
@@ -34,11 +35,12 @@ type Props = {
   invoice: Invoice
   products: ProductForInvoice[]
   canManage: boolean
-  onClose: () => void
+  canIssue: boolean
+  onClose: (msg?: string) => void
   onEditHeader: () => void
 }
 
-export function InvoiceDetailModal({ invoice, products, canManage, onClose, onEditHeader }: Props) {
+export function InvoiceDetailModal({ invoice, products, canManage, canIssue, onClose, onEditHeader }: Props) {
   const { t } = useT()
   const s = t.invoices
 
@@ -58,6 +60,9 @@ export function InvoiceDetailModal({ invoice, products, canManage, onClose, onEd
   const [isSaving, startSave] = useTransition()
 
   const [isRemoving, startRemove] = useTransition()
+
+  const [confirmIssue, setConfirmIssue] = useState(false)
+  const [isIssuing, startIssue] = useTransition()
 
   useEffect(() => {
     let active = true
@@ -162,6 +167,22 @@ export function InvoiceDetailModal({ invoice, products, canManage, onClose, onEd
     })
   }
 
+  const handleIssue = () => {
+    startIssue(async () => {
+      const result = await issueInvoice(invoice.id)
+      if (!result.success) {
+        const msg =
+          result.error === 'errIssueNoItems' ? s.errIssueNoItems :
+          result.error === 'errLocked'       ? s.errLocked :
+          result.error
+        setActionError(msg)
+        setConfirmIssue(false)
+        return
+      }
+      onClose(s.successIssue)
+    })
+  }
+
   const statusBadgeClass = (status: string) => {
     if (status === 'draft') return 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
     if (status === 'issued') return 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400'
@@ -204,7 +225,7 @@ export function InvoiceDetailModal({ invoice, products, canManage, onClose, onEd
             </p>
           </div>
           <div className="flex items-center gap-2">
-            {canManage && canEdit && (
+            {canManage && canEdit && !confirmIssue && (
               <button
                 onClick={onEditHeader}
                 className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
@@ -212,14 +233,44 @@ export function InvoiceDetailModal({ invoice, products, canManage, onClose, onEd
                 {s.modalEditTitle}
               </button>
             )}
+            {canIssue && canEdit && !confirmIssue && (
+              <button
+                onClick={() => setConfirmIssue(true)}
+                className="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700"
+              >
+                {s.issueAction}
+              </button>
+            )}
             <button
-              onClick={onClose}
+              onClick={() => onClose()}
               className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
             >
               <X className="h-4 w-4" />
             </button>
           </div>
         </div>
+
+        {/* Issue confirmation strip */}
+        {confirmIssue && (
+          <div className="border-b border-amber-100 bg-amber-50 px-6 py-3 dark:border-amber-900/30 dark:bg-amber-900/10">
+            <p className="mb-2 text-xs text-amber-700 dark:text-amber-400">{s.issueConfirm}</p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleIssue}
+                disabled={isIssuing}
+                className="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700 disabled:opacity-50"
+              >
+                {isIssuing ? s.issuing : s.issueAction}
+              </button>
+              <button
+                onClick={() => setConfirmIssue(false)}
+                className="text-xs text-gray-500 hover:underline dark:text-gray-400"
+              >
+                {s.cancel}
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Summary strip */}
         <div className="flex flex-wrap gap-x-6 gap-y-1 border-b border-gray-50 bg-gray-50/50 px-6 py-3 text-xs text-gray-500 dark:border-gray-800 dark:bg-gray-800/30 dark:text-gray-400">
@@ -450,7 +501,7 @@ export function InvoiceDetailModal({ invoice, products, canManage, onClose, onEd
         {/* Footer */}
         <div className="flex justify-end border-t border-gray-100 px-6 py-4 dark:border-gray-800">
           <button
-            onClick={onClose}
+            onClick={() => onClose()}
             className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
           >
             {s.close}
