@@ -25,6 +25,7 @@ export type Invoice = {
   created_at: string
   updated_at: string
   customers: { id: string; name: string } | null
+  outgoing_orders: { id: string; order_number: string; customer_name: string | null } | null
 }
 
 export type CustomerOption = {
@@ -32,9 +33,16 @@ export type CustomerOption = {
   name: string
 }
 
+export type OrderForInvoice = {
+  id: string
+  order_number: string
+  customer_name: string | null
+}
+
 export type InvoiceInput = {
   invoice_number: string
   customer_id: string
+  outgoing_order_id: string | null
   invoice_date: string | null
   due_date: string | null
   note: string | null
@@ -265,6 +273,7 @@ export async function createInvoice(input: InvoiceInput): Promise<InvoiceResult>
       company_id: CO,
       invoice_number: input.invoice_number.trim(),
       customer_id: input.customer_id,
+      outgoing_order_id: input.outgoing_order_id || null,
       invoice_date: input.invoice_date || null,
       due_date: input.due_date || null,
       note: input.note?.trim() || null,
@@ -299,6 +308,7 @@ export async function updateInvoice(id: string, input: InvoiceInput): Promise<In
       .update({
         invoice_number: input.invoice_number.trim(),
         customer_id: input.customer_id,
+        outgoing_order_id: input.outgoing_order_id || null,
         invoice_date: input.invoice_date || null,
         due_date: input.due_date || null,
         note: input.note?.trim() || null,

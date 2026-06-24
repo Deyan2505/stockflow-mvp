@@ -2,12 +2,13 @@
 
 import { useState, useTransition } from 'react'
 import { X } from 'lucide-react'
-import { type Invoice, type InvoiceInput, type CustomerOption, createInvoice, updateInvoice } from './actions'
+import { type Invoice, type InvoiceInput, type CustomerOption, type OrderForInvoice, createInvoice, updateInvoice } from './actions'
 import { useT } from '@/lib/i18n'
 
 type FormState = {
   invoice_number: string
   customer_id: string
+  outgoing_order_id: string
   invoice_date: string
   due_date: string
   note: string
@@ -19,6 +20,7 @@ const today = () => new Date().toISOString().split('T')[0]
 const empty = (): FormState => ({
   invoice_number: '',
   customer_id: '',
+  outgoing_order_id: '',
   invoice_date: today(),
   due_date: '',
   note: '',
@@ -29,6 +31,7 @@ function toForm(inv: Invoice): FormState {
   return {
     invoice_number: inv.invoice_number,
     customer_id: inv.customer_id,
+    outgoing_order_id: inv.outgoing_order_id ?? '',
     invoice_date: inv.invoice_date,
     due_date: inv.due_date ?? '',
     note: inv.note ?? '',
@@ -39,10 +42,11 @@ function toForm(inv: Invoice): FormState {
 type Props = {
   invoice: Invoice | null
   customers: CustomerOption[]
+  orders: OrderForInvoice[]
   onClose: (msg?: string) => void
 }
 
-export function InvoiceModal({ invoice, customers, onClose }: Props) {
+export function InvoiceModal({ invoice, customers, orders, onClose }: Props) {
   const { t } = useT()
   const s = t.invoices
 
@@ -64,6 +68,7 @@ export function InvoiceModal({ invoice, customers, onClose }: Props) {
     const input: InvoiceInput = {
       invoice_number: form.invoice_number,
       customer_id: form.customer_id,
+      outgoing_order_id: form.outgoing_order_id || null,
       invoice_date: form.invoice_date || null,
       due_date: form.due_date || null,
       note: form.note || null,
@@ -134,6 +139,25 @@ export function InvoiceModal({ invoice, customers, onClose }: Props) {
                   className={inputClass}
                   placeholder={s.invoiceNumberPlaceholder}
                 />
+              </div>
+
+              {/* Outgoing order — full width, optional */}
+              <div className="col-span-2">
+                <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
+                  {s.fOrder}
+                </label>
+                <select
+                  value={form.outgoing_order_id}
+                  onChange={(e) => set('outgoing_order_id', e.target.value)}
+                  className={inputClass}
+                >
+                  <option value="">{s.noOrder}</option>
+                  {orders.map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.order_number}{o.customer_name ? ` — ${o.customer_name}` : ''}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {/* Customer — full width */}

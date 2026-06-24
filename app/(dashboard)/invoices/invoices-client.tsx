@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useMemo } from 'react'
 import { Search } from 'lucide-react'
-import { type Invoice, type InvoiceResult, type CustomerOption, type ProductForInvoice, cancelInvoice } from './actions'
+import { type Invoice, type InvoiceResult, type CustomerOption, type ProductForInvoice, type OrderForInvoice, cancelInvoice } from './actions'
 import { InvoiceModal } from './invoice-modal'
 import { InvoiceDetailModal } from './invoice-detail-modal'
 import { cn } from '@/lib/utils'
@@ -16,12 +16,14 @@ export function InvoicesClient({
   invoices,
   customers,
   products,
+  orders,
   canManage,
   canIssue,
 }: {
   invoices: Invoice[]
   customers: CustomerOption[]
   products: ProductForInvoice[]
+  orders: OrderForInvoice[]
   canManage: boolean
   canIssue: boolean
 }) {
@@ -250,6 +252,7 @@ export function InvoicesClient({
         <InvoiceModal
           invoice={modal === 'new' ? null : modal}
           customers={customers}
+          orders={orders}
           onClose={handleModalClose}
         />
       )}

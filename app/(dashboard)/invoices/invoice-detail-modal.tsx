@@ -280,6 +280,15 @@ export function InvoiceDetailModal({ invoice, products, canManage, canIssue, onC
           {invoice.note && (
             <span>{s.fNote}: <strong className="text-gray-700 dark:text-gray-300">{invoice.note}</strong></span>
           )}
+          {invoice.outgoing_orders && (
+            <span>
+              {s.orderRefLabel}:{' '}
+              <strong className="text-gray-700 dark:text-gray-300">
+                {invoice.outgoing_orders.order_number}
+                {invoice.outgoing_orders.customer_name ? ` — ${invoice.outgoing_orders.customer_name}` : ''}
+              </strong>
+            </span>
+          )}
         </div>
 
         {/* Scrollable body */}

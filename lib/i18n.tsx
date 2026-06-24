@@ -293,6 +293,9 @@ const dict = {
       issueConfirm: 'Издаването ще заключи фактурата. След това няма да можеш да редактираш заглавната част или редовете. Сигурен ли си?',
       successIssue: 'Фактурата е издадена успешно',
       errIssueNoItems: 'Фактурата трябва да има поне един ред преди издаване',
+      fOrder: 'Изходяща поръчка (незадължителна)',
+      noOrder: '— Без поръчка —',
+      orderRefLabel: 'Поръчка',
     },
     deliveries: {
       title: 'Входящи доставки',
@@ -809,6 +812,9 @@ const dict = {
       issueConfirm: 'Issuing will lock this invoice. After that, you will not be able to edit the header or line items. Are you sure?',
       successIssue: 'Invoice issued successfully',
       errIssueNoItems: 'Invoice must have at least one line item before issuing',
+      fOrder: 'Outgoing order (optional)',
+      noOrder: '— No order —',
+      orderRefLabel: 'Order',
     },
     deliveries: {
       title: 'Incoming Deliveries',

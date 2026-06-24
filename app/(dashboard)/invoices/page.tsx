@@ -4,7 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { getCurrentRole } from '@/lib/current-user'
 import { can } from '@/lib/permissions'
 import { InvoicesClient } from './invoices-client'
-import type { Invoice, CustomerOption, ProductForInvoice } from './actions'
+import type { Invoice, CustomerOption, ProductForInvoice, OrderForInvoice } from './actions'
 
 const CO = process.env.DEMO_COMPANY_ID!
 
@@ -14,10 +14,10 @@ export default async function InvoicesPage() {
   const canIssue = can(role, 'issue_invoice')
   const sb = createAdminClient()
 
-  const [{ data: invoices }, { data: customers }, { data: products }] = await Promise.all([
+  const [{ data: invoices }, { data: customers }, { data: products }, { data: orders }] = await Promise.all([
     sb
       .from('invoices')
-      .select('*, customers(id, name)')
+      .select('*, customers(id, name), outgoing_orders(id, order_number, customer_name)')
       .eq('company_id', CO)
       .order('created_at', { ascending: false }),
     sb
@@ -32,6 +32,12 @@ export default async function InvoicesPage() {
       .eq('company_id', CO)
       .eq('status', 'active')
       .order('name'),
+    sb
+      .from('outgoing_orders')
+      .select('id, order_number, customer_name')
+      .eq('company_id', CO)
+      .neq('status', 'cancelled')
+      .order('created_at', { ascending: false }),
   ])
 
   return (
@@ -39,6 +45,7 @@ export default async function InvoicesPage() {
       invoices={(invoices ?? []) as unknown as Invoice[]}
       customers={(customers ?? []) as CustomerOption[]}
       products={(products ?? []) as ProductForInvoice[]}
+      orders={(orders ?? []) as OrderForInvoice[]}
       canManage={canManage}
       canIssue={canIssue}
     />
