@@ -5,15 +5,17 @@ import { X } from 'lucide-react'
 import { type Order, type OrderInput, createOrder, updateOrder } from './actions'
 import { useT } from '@/lib/i18n'
 
-// v0.6 Step 1: header only — no order items, no products, no quantities
+type CustomerOption = { id: string; name: string }
 
 type Props = {
   order: Order | null
+  customers: CustomerOption[]
   onClose: (successMsg?: string) => void
 }
 
 type HeaderForm = {
   order_number:  string
+  customer_id:   string
   customer_name: string
   status:        'draft' | 'open'
   order_date:    string
@@ -25,16 +27,17 @@ function initHeader(o: Order | null): HeaderForm {
   return o
     ? {
         order_number:  o.order_number,
+        customer_id:   o.customer_id ?? '',
         customer_name: o.customer_name ?? '',
         status:        o.status === 'open' ? 'open' : 'draft',
         order_date:    o.order_date ?? '',
         expected_date: o.expected_date ?? '',
         note:          o.note ?? '',
       }
-    : { order_number: '', customer_name: '', status: 'draft', order_date: '', expected_date: '', note: '' }
+    : { order_number: '', customer_id: '', customer_name: '', status: 'draft', order_date: '', expected_date: '', note: '' }
 }
 
-export function OrderModal({ order, onClose }: Props) {
+export function OrderModal({ order, customers, onClose }: Props) {
   const { t } = useT()
   const o = t.orders
 
@@ -45,9 +48,21 @@ export function OrderModal({ order, onClose }: Props) {
   const setField = (key: keyof HeaderForm, val: string) =>
     setForm((f) => ({ ...f, [key]: val }))
 
+  const isLegacy = order !== null && order.customer_id === null && !!order.customer_name
+
+  const handleCustomerChange = (id: string) => {
+    const found = customers.find((c) => c.id === id)
+    setForm((f) => ({
+      ...f,
+      customer_id:   id,
+      customer_name: found ? found.name : f.customer_name,
+    }))
+  }
+
   const validate = (): string | null => {
     if (!form.order_number.trim()) return o.errNumber
-    if (!form.customer_name.trim()) return o.errCustomerRequired
+    // New orders require customer selection; legacy edit may skip
+    if (!order && !form.customer_id) return o.errCustomerRequired
     return null
   }
 
@@ -59,7 +74,8 @@ export function OrderModal({ order, onClose }: Props) {
 
     const input: OrderInput = {
       order_number:  form.order_number,
-      customer_name: form.customer_name.trim(),
+      customer_id:   form.customer_id || null,
+      customer_name: form.customer_name || null,
       status:        form.status,
       order_date:    form.order_date || null,
       expected_date: form.expected_date || null,
@@ -70,7 +86,10 @@ export function OrderModal({ order, onClose }: Props) {
       const result = order
         ? await updateOrder(order.id, input)
         : await createOrder(input)
-      if (!result.success) { setError(result.error); return }
+      if (!result.success) {
+        setError(result.error === 'errCustomerRequired' ? o.errCustomerRequired : result.error)
+        return
+      }
       onClose(order ? o.successUpdate : o.successCreate)
     })
   }
@@ -98,6 +117,20 @@ export function OrderModal({ order, onClose }: Props) {
           </button>
         </div>
 
+        {customers.length === 0 ? (
+          <div className="p-6">
+            <p className="text-sm text-amber-600 dark:text-amber-400">{o.noCustomers}</p>
+            <div className="mt-6 flex justify-end">
+              <button
+                type="button"
+                onClick={() => onClose()}
+                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
+              >
+                {o.cancel}
+              </button>
+            </div>
+          </div>
+        ) : (
         <form onSubmit={handleSubmit} className="flex flex-1 flex-col overflow-hidden">
           <div className="flex-1 overflow-y-auto p-6">
             <div className="grid grid-cols-2 gap-4">
@@ -116,15 +149,23 @@ export function OrderModal({ order, onClose }: Props) {
 
               <div className="col-span-2">
                 <label className={labelCls}>
-                  {o.fCustomer} <span className="text-red-500">*</span>
+                  {o.fCustomer} {!isLegacy && <span className="text-red-500">*</span>}
                 </label>
-                <input
-                  type="text"
-                  value={form.customer_name}
-                  onChange={(e) => setField('customer_name', e.target.value)}
+                <select
+                  value={form.customer_id}
+                  onChange={(e) => handleCustomerChange(e.target.value)}
                   className={inputCls}
-                  placeholder={o.customerPlaceholder}
-                />
+                >
+                  <option value="">{o.selectCustomer}</option>
+                  {customers.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+                {isLegacy && !form.customer_id && (
+                  <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+                    {o.legacyCustomerNote} {order.customer_name}
+                  </p>
+                )}
               </div>
 
               <div>
@@ -197,6 +238,7 @@ export function OrderModal({ order, onClose }: Props) {
             </button>
           </div>
         </form>
+        )}
       </div>
     </div>
   )

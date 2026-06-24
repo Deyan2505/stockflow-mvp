@@ -9,15 +9,18 @@ import { IssueModal } from './issue-modal'
 import { cn } from '@/lib/utils'
 import { useT } from '@/lib/i18n'
 
+type CustomerOption = { id: string; name: string }
+
 type Props = {
   orders: Order[]
   products: Product[]
   locations: Location[]
+  customers: CustomerOption[]
   canIssue: boolean
   canManage: boolean
 }
 
-export function OrdersClient({ orders, products, locations, canIssue, canManage }: Props) {
+export function OrdersClient({ orders, products, locations, customers, canIssue, canManage }: Props) {
   const { t } = useT()
   const o = t.orders
 
@@ -235,6 +238,7 @@ export function OrdersClient({ orders, products, locations, canIssue, canManage 
       {canManage && modal !== null && (
         <OrderModal
           order={modal === 'new' ? null : modal}
+          customers={customers}
           onClose={handleModalClose}
         />
       )}

@@ -16,6 +16,7 @@ export type Order = {
   id: string
   company_id: string
   order_number: string
+  customer_id: string | null
   customer_name: string | null
   status: 'draft' | 'open' | 'fulfilled' | 'cancelled'
   order_date: string | null
@@ -28,6 +29,7 @@ export type Order = {
 
 export type OrderInput = {
   order_number: string
+  customer_id: string | null
   customer_name: string | null
   status: 'draft' | 'open'
   order_date: string | null
@@ -63,8 +65,8 @@ export async function createOrder(input: OrderInput): Promise<OrderResult> {
     await requirePermission('manage_orders')
     const sb = createAdminClient()
 
-    if (!input.customer_name?.trim()) {
-      throw new Error('Името на клиента е задължително')
+    if (!input.customer_id) {
+      throw new Error('errCustomerRequired')
     }
 
     const { error } = await sb
@@ -72,7 +74,8 @@ export async function createOrder(input: OrderInput): Promise<OrderResult> {
       .insert({
         company_id:    CO,
         order_number:  input.order_number.trim(),
-        customer_name: input.customer_name.trim(),
+        customer_id:   input.customer_id,
+        customer_name: input.customer_name?.trim() || null,
         status:        input.status,
         order_date:    input.order_date || null,
         expected_date: input.expected_date || null,
@@ -96,15 +99,12 @@ export async function updateOrder(id: string, input: OrderInput): Promise<OrderR
     await requirePermission('manage_orders')
     const sb = createAdminClient()
 
-    if (!input.customer_name?.trim()) {
-      throw new Error('Името на клиента е задължително')
-    }
-
     const { error } = await sb
       .from('outgoing_orders')
       .update({
         order_number:  input.order_number.trim(),
-        customer_name: input.customer_name.trim(),
+        customer_id:   input.customer_id || null,
+        customer_name: input.customer_name?.trim() || null,
         status:        input.status,
         order_date:    input.order_date || null,
         expected_date: input.expected_date || null,

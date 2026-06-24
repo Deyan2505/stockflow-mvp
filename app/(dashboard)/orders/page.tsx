@@ -8,16 +8,18 @@ import { can } from '@/lib/permissions'
 
 const CO = process.env.DEMO_COMPANY_ID!
 
+type CustomerOption = { id: string; name: string }
+
 export default async function OrdersPage() {
   const role = await getCurrentRole()
   const canIssue = can(role, 'issue_stock')
   const canManage = can(role, 'manage_orders')
   const sb = createAdminClient()
 
-  const [{ data: orders }, { data: products }, { data: locations }] = await Promise.all([
+  const [{ data: orders }, { data: products }, { data: locations }, { data: customers }] = await Promise.all([
     sb
       .from('outgoing_orders')
-      .select('id, company_id, order_number, customer_name, status, order_date, expected_date, issued_date, note, created_at, updated_at')
+      .select('id, company_id, order_number, customer_id, customer_name, status, order_date, expected_date, issued_date, note, created_at, updated_at')
       .eq('company_id', CO)
       .order('created_at', { ascending: false }),
     sb
@@ -32,6 +34,12 @@ export default async function OrdersPage() {
       .eq('company_id', CO)
       .eq('status', 'active')
       .order('code'),
+    sb
+      .from('customers')
+      .select('id, name')
+      .eq('company_id', CO)
+      .eq('status', 'active')
+      .order('name'),
   ])
 
   return (
@@ -39,6 +47,7 @@ export default async function OrdersPage() {
       orders={(orders ?? []) as unknown as Order[]}
       products={(products ?? []) as unknown as Product[]}
       locations={(locations ?? []) as unknown as Location[]}
+      customers={(customers ?? []) as CustomerOption[]}
       canIssue={canIssue}
       canManage={canManage}
     />
