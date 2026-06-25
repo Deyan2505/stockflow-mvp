@@ -10,6 +10,7 @@ import {
   addInvoiceItem,
   updateInvoiceItem,
   removeInvoiceItem,
+  importOrderItems,
   issueInvoice,
 } from './actions'
 import { cn } from '@/lib/utils'
@@ -60,6 +61,9 @@ export function InvoiceDetailModal({ invoice, products, canManage, canIssue, onC
   const [isSaving, startSave] = useTransition()
 
   const [isRemoving, startRemove] = useTransition()
+
+  const [confirmImport, setConfirmImport] = useState(false)
+  const [isImporting, startImport] = useTransition()
 
   const [confirmIssue, setConfirmIssue] = useState(false)
   const [isIssuing, startIssue] = useTransition()
@@ -163,6 +167,25 @@ export function InvoiceDetailModal({ invoice, products, canManage, canIssue, onC
         setActionError(msg)
         return
       }
+      await refresh()
+    })
+  }
+
+  const handleImport = () => {
+    startImport(async () => {
+      const result = await importOrderItems(invoice.id)
+      if (!result.success) {
+        const msg =
+          result.error === 'errImportNotEmpty' ? s.errImportNotEmpty :
+          result.error === 'errNoOrderLink'    ? s.errNoOrderLink :
+          result.error === 'errNoOrderItems'   ? s.errNoOrderItems :
+          result.error === 'errLocked'         ? s.errLocked :
+          result.error
+        setActionError(msg)
+        setConfirmImport(false)
+        return
+      }
+      setConfirmImport(false)
       await refresh()
     })
   }
@@ -322,7 +345,37 @@ export function InvoiceDetailModal({ invoice, products, canManage, canIssue, onC
           {loading ? (
             <p className="py-6 text-center text-sm text-gray-400">{s.loading}</p>
           ) : items.length === 0 ? (
-            <p className="py-6 text-center text-sm text-gray-400">{s.itemsEmpty}</p>
+            <div className="py-6 text-center">
+              <p className="text-sm text-gray-400 dark:text-gray-500">{s.itemsEmpty}</p>
+              {canManage && canEdit && invoice.outgoing_order_id && !confirmImport && (
+                <button
+                  onClick={() => setConfirmImport(true)}
+                  className="mt-3 text-xs text-blue-600 hover:underline dark:text-blue-400"
+                >
+                  {s.importBtn}
+                </button>
+              )}
+              {canManage && canEdit && invoice.outgoing_order_id && confirmImport && (
+                <div className="mt-3 space-y-2 px-4">
+                  <p className="text-xs text-amber-700 dark:text-amber-400">{s.importConfirm}</p>
+                  <div className="flex justify-center gap-3">
+                    <button
+                      onClick={handleImport}
+                      disabled={isImporting}
+                      className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      {isImporting ? s.importing : s.importBtn}
+                    </button>
+                    <button
+                      onClick={() => setConfirmImport(false)}
+                      className="text-xs text-gray-400 hover:underline dark:text-gray-500"
+                    >
+                      {s.cancel}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           ) : (
             <div className="mb-4 rounded-lg border border-gray-100 dark:border-gray-800">
               <table className="w-full text-xs">

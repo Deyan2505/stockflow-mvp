@@ -233,6 +233,69 @@ export async function removeInvoiceItem(itemId: string): Promise<InvoiceItemResu
   }
 }
 
+export async function importOrderItems(invoiceId: string): Promise<InvoiceResult> {
+  try {
+    await requirePermission('manage_invoices')
+    const sb = createAdminClient()
+
+    const { data: inv } = await sb
+      .from('invoices')
+      .select('status, vat_rate, outgoing_order_id')
+      .eq('id', invoiceId)
+      .eq('company_id', CO)
+      .single()
+
+    if (!inv) throw new Error('Фактурата не е намерена')
+    if (inv.status !== 'draft') throw new Error('errLocked')
+    if (!inv.outgoing_order_id) throw new Error('errNoOrderLink')
+
+    const { count: existingCount } = await sb
+      .from('invoice_items')
+      .select('id', { count: 'exact', head: true })
+      .eq('invoice_id', invoiceId)
+      .eq('company_id', CO)
+
+    if (existingCount && existingCount > 0) throw new Error('errImportNotEmpty')
+
+    // Uses ordered_quantity — invoice is a commercial document, not a fulfillment document
+    const { data: orderItems } = await sb
+      .from('outgoing_order_items')
+      .select('product_id, ordered_quantity, products(name, sale_price)')
+      .eq('order_id', inv.outgoing_order_id)
+      .order('created_at', { ascending: true })
+
+    if (!orderItems || orderItems.length === 0) throw new Error('errNoOrderItems')
+
+    const rows = orderItems.map((oi) => {
+      const product = oi.products as unknown as { name: string; sale_price: number | null } | null
+      const quantity = Number(oi.ordered_quantity)
+      const unit_price = round2(Number(product?.sale_price ?? 0))
+      return {
+        invoice_id: invoiceId,
+        company_id: CO,
+        product_id: oi.product_id,
+        description: product?.name ?? 'Продукт',
+        quantity,
+        unit_price,
+        amount: round2(quantity * unit_price),
+      }
+    })
+
+    const { error } = await sb.from('invoice_items').insert(rows)
+    if (error) throw new Error(error.message)
+
+    await recalcInvoiceTotals(sb, invoiceId, Number(inv.vat_rate))
+
+    revalidatePath('/invoices')
+    return { success: true }
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Грешка, опитай отново',
+    }
+  }
+}
+
 export async function issueInvoice(id: string): Promise<InvoiceResult> {
   try {
     await requirePermission('issue_invoice')
