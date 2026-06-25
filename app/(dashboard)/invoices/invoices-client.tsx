@@ -92,6 +92,18 @@ export function InvoicesClient({
     return s.statusCancelled
   }
 
+  const paymentStatusLabel = (status?: string | null) => {
+    if (status === 'paid') return s.paymentStatusPaid
+    if (status === 'partially_paid') return s.paymentStatusPartiallyPaid
+    return s.paymentStatusUnpaid
+  }
+
+  const paymentStatusClass = (status?: string | null) => {
+    if (status === 'paid') return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+    if (status === 'partially_paid') return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+    return 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
+  }
+
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
@@ -205,14 +217,26 @@ export function InvoicesClient({
                     {item.total.toFixed(2)}
                   </td>
                   <td className="px-4 py-3">
-                    <span
-                      className={cn(
-                        'inline-flex rounded-full px-2 py-0.5 text-xs font-medium',
-                        statusBadgeClass(item.status)
+                    <div className="flex flex-col items-start gap-1">
+                      <span
+                        className={cn(
+                          'inline-flex rounded-full px-2 py-0.5 text-xs font-medium',
+                          statusBadgeClass(item.status)
+                        )}
+                      >
+                        {statusLabel(item.status)}
+                      </span>
+                      {item.status === 'issued' && item.payment_status && (
+                        <span
+                          className={cn(
+                            'inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium',
+                            paymentStatusClass(item.payment_status)
+                          )}
+                        >
+                          {paymentStatusLabel(item.payment_status)}
+                        </span>
                       )}
-                    >
-                      {statusLabel(item.status)}
-                    </span>
+                    </div>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">

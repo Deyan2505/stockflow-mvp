@@ -22,6 +22,8 @@ export type Invoice = {
   vat_rate: number
   vat_amount: number
   total: number
+  amount_paid: number
+  payment_status: PaymentStatus
   created_at: string
   updated_at: string
   customers: { id: string; name: string } | null
@@ -80,6 +82,31 @@ export type InvoiceItemInput = {
 
 export type InvoiceItemResult = { success: true } | { success: false; error: string }
 
+export type PaymentMethod = 'bank_transfer' | 'cash' | 'card' | 'other'
+export type PaymentStatus = 'unpaid' | 'partially_paid' | 'paid'
+
+export type InvoicePayment = {
+  id: string
+  invoice_id: string
+  company_id: string
+  amount: number
+  payment_date: string
+  payment_method: PaymentMethod
+  note: string | null
+  created_at: string
+}
+
+export type PaymentInput = {
+  amount: number
+  payment_date: string
+  payment_method: PaymentMethod
+  note: string | null
+}
+
+export type PaymentResult =
+  | { success: true }
+  | { success: false; error: string }
+
 const round2 = (n: number) => Math.round(n * 100) / 100
 
 async function recalcInvoiceTotals(
@@ -102,6 +129,114 @@ async function recalcInvoiceTotals(
     .eq('id', invoiceId)
     .eq('company_id', CO)
   if (error) throw new Error(error.message)
+}
+
+async function recalcPaymentStatus(
+  sb: ReturnType<typeof createAdminClient>,
+  invoiceId: string,
+  invoiceTotal: number
+) {
+  const { data, error } = await sb
+    .from('invoice_payments')
+    .select('amount')
+    .eq('invoice_id', invoiceId)
+    .eq('company_id', CO)
+  if (error) throw new Error(error.message)
+  const amount_paid = round2((data ?? []).reduce((sum, row) => sum + Number(row.amount || 0), 0))
+  const payment_status: PaymentStatus =
+    amount_paid === 0
+      ? 'unpaid'
+      : amount_paid >= round2(invoiceTotal)
+        ? 'paid'
+        : 'partially_paid'
+  const { error: updateError } = await sb
+    .from('invoices')
+    .update({ amount_paid, payment_status })
+    .eq('id', invoiceId)
+    .eq('company_id', CO)
+  if (updateError) throw new Error(updateError.message)
+}
+
+export async function getInvoicePayments(invoiceId: string): Promise<InvoicePayment[]> {
+  const sb = createAdminClient()
+  const { data, error } = await sb
+    .from('invoice_payments')
+    .select('*')
+    .eq('invoice_id', invoiceId)
+    .eq('company_id', CO)
+    .order('created_at', { ascending: true })
+  if (error) throw new Error(error.message)
+  return (data ?? []) as InvoicePayment[]
+}
+
+export async function recordPayment(
+  invoiceId: string,
+  input: PaymentInput
+): Promise<PaymentResult> {
+  try {
+    await requirePermission('manage_invoices')
+    const sb = createAdminClient()
+    const amount = round2(Number(input.amount))
+    if (!Number.isFinite(amount) || amount <= 0) throw new Error('errPaymentAmount')
+    const { data: invoice, error: invoiceError } = await sb
+      .from('invoices')
+      .select('id, status, total, amount_paid')
+      .eq('id', invoiceId)
+      .eq('company_id', CO)
+      .single()
+    if (invoiceError || !invoice) throw new Error(invoiceError?.message || 'Фактурата не е намерена')
+    if (invoice.status !== 'issued') throw new Error('errPaymentNotIssued')
+    const total = round2(Number(invoice.total || 0))
+    const currentPaid = round2(Number(invoice.amount_paid || 0))
+    if (round2(currentPaid + amount) > total) throw new Error('errOverpayment')
+    const { error } = await sb.from('invoice_payments').insert({
+      invoice_id: invoiceId,
+      company_id: CO,
+      amount,
+      payment_date: input.payment_date,
+      payment_method: input.payment_method,
+      note: input.note?.trim() || null,
+    })
+    if (error) throw new Error(error.message)
+    await recalcPaymentStatus(sb, invoiceId, total)
+    revalidatePath('/invoices')
+    return { success: true }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Грешка, опитай отново' }
+  }
+}
+
+export async function deletePayment(paymentId: string): Promise<PaymentResult> {
+  try {
+    await requirePermission('manage_invoices')
+    const sb = createAdminClient()
+    const { data: payment, error: paymentError } = await sb
+      .from('invoice_payments')
+      .select('id, invoice_id')
+      .eq('id', paymentId)
+      .eq('company_id', CO)
+      .single()
+    if (paymentError || !payment) throw new Error(paymentError?.message || 'Плащането не е намерено')
+    const { data: invoice, error: invoiceError } = await sb
+      .from('invoices')
+      .select('id, status, total')
+      .eq('id', payment.invoice_id)
+      .eq('company_id', CO)
+      .single()
+    if (invoiceError || !invoice) throw new Error(invoiceError?.message || 'Фактурата не е намерена')
+    if (invoice.status !== 'issued') throw new Error('errPaymentNotIssued')
+    const { error } = await sb
+      .from('invoice_payments')
+      .delete()
+      .eq('id', paymentId)
+      .eq('company_id', CO)
+    if (error) throw new Error(error.message)
+    await recalcPaymentStatus(sb, payment.invoice_id, Number(invoice.total || 0))
+    revalidatePath('/invoices')
+    return { success: true }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Грешка, опитай отново' }
+  }
 }
 
 export async function getInvoiceItems(invoiceId: string): Promise<InvoiceItem[]> {

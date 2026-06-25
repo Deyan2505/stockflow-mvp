@@ -6,12 +6,18 @@ import {
   type Invoice,
   type InvoiceItem,
   type ProductForInvoice,
+  type InvoicePayment,
+  type PaymentInput,
+  type PaymentMethod,
   getInvoiceItems,
+  getInvoicePayments,
   addInvoiceItem,
   updateInvoiceItem,
   removeInvoiceItem,
   importOrderItems,
   issueInvoice,
+  recordPayment,
+  deletePayment,
 } from './actions'
 import { cn } from '@/lib/utils'
 import { useT } from '@/lib/i18n'
@@ -68,23 +74,48 @@ export function InvoiceDetailModal({ invoice, products, canManage, canIssue, onC
   const [confirmIssue, setConfirmIssue] = useState(false)
   const [isIssuing, startIssue] = useTransition()
 
+  const [payments, setPayments] = useState<InvoicePayment[]>([])
+  const [paymentsLoading, setPaymentsLoading] = useState(false)
+  const [payError, setPayError] = useState<string | null>(null)
+  const [payForm, setPayForm] = useState({
+    amount: '',
+    payment_date: new Date().toISOString().slice(0, 10),
+    payment_method: 'bank_transfer' as PaymentMethod,
+    note: '',
+  })
+  const [isRecording, startRecord] = useTransition()
+  const [isDeletingPayment, startDeletePayment] = useTransition()
+
   useEffect(() => {
     let active = true
     getInvoiceItems(invoice.id).then((fresh) => {
-      if (active) {
-        setItems(fresh)
-        setLoading(false)
-      }
+      if (active) { setItems(fresh); setLoading(false) }
     })
-    return () => {
-      active = false
-    }
+    setPaymentsLoading(true)
+    getInvoicePayments(invoice.id).then((data) => {
+      if (active) { setPayments(data); setPaymentsLoading(false) }
+    })
+    return () => { active = false }
   }, [invoice.id])
 
   const refresh = async () => {
     const fresh = await getInvoiceItems(invoice.id)
     setItems(fresh)
   }
+
+  const refreshPayments = async () => {
+    setPaymentsLoading(true)
+    try {
+      const data = await getInvoicePayments(invoice.id)
+      setPayments(data)
+    } finally {
+      setPaymentsLoading(false)
+    }
+  }
+
+  const round2Local = (n: number) => Math.round(n * 100) / 100
+  const amountPaid = round2Local(Number(invoice.amount_paid || 0))
+  const balanceDue = Math.max(0, round2Local(Number(invoice.total || 0) - amountPaid))
 
   const subtotal = round2(items.reduce((sum, item) => sum + Number(item.amount), 0))
   const vatAmount = round2((subtotal * invoice.vat_rate) / 100)
@@ -203,6 +234,63 @@ export function InvoiceDetailModal({ invoice, products, canManage, canIssue, onC
         return
       }
       onClose(s.successIssue)
+    })
+  }
+
+  const paymentMethodLabel = (method: PaymentMethod) => {
+    if (method === 'cash') return s.paymentMethodCash
+    if (method === 'card') return s.paymentMethodCard
+    if (method === 'other') return s.paymentMethodOther
+    return s.paymentMethodBankTransfer
+  }
+
+  const paymentStatusLabel = (status: string) => {
+    if (status === 'paid') return s.paymentStatusPaid
+    if (status === 'partially_paid') return s.paymentStatusPartiallyPaid
+    return s.paymentStatusUnpaid
+  }
+
+  const paymentStatusBadgeClass = (status: string) => {
+    if (status === 'paid') return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+    if (status === 'partially_paid') return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+    return 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
+  }
+
+  const handleRecordPayment = () => {
+    setPayError(null)
+    startRecord(async () => {
+      const input: PaymentInput = {
+        amount: Number(payForm.amount),
+        payment_date: payForm.payment_date,
+        payment_method: payForm.payment_method,
+        note: payForm.note || null,
+      }
+      const result = await recordPayment(invoice.id, input)
+      if (!result.success) {
+        const msg =
+          result.error === 'errOverpayment'        ? s.errOverpayment :
+          result.error === 'errPaymentAmount'       ? s.errPaymentAmount :
+          result.error === 'errPaymentNotIssued'    ? s.errPaymentNotIssued :
+          result.error
+        setPayError(msg)
+        return
+      }
+      setPayForm({ amount: '', payment_date: new Date().toISOString().slice(0, 10), payment_method: 'bank_transfer', note: '' })
+      await refreshPayments()
+      await refresh()
+    })
+  }
+
+  const handleDeletePayment = (paymentId: string) => {
+    startDeletePayment(async () => {
+      const result = await deletePayment(paymentId)
+      if (!result.success) {
+        const msg = result.error === 'errPaymentNotIssued' ? s.errPaymentNotIssued : result.error
+        setPayError(msg)
+        return
+      }
+      await refreshPayments()
+      await refresh()
     })
   }
 
@@ -497,6 +585,124 @@ export function InvoiceDetailModal({ invoice, products, canManage, canIssue, onC
               <span className="tabular-nums">{total.toFixed(2)}</span>
             </div>
           </div>
+
+          {/* Payments section — visible for all users on issued invoices */}
+          {invoice.status === 'issued' && (
+            <div className="mb-4">
+              {/* Payment summary */}
+              <div className="mb-3 flex items-center justify-between rounded-lg border border-gray-100 bg-gray-50/50 px-4 py-3 dark:border-gray-800 dark:bg-gray-800/30">
+                <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
+                  <span>{s.paymentAmountPaid}: <strong className="tabular-nums text-gray-800 dark:text-gray-200">{amountPaid.toFixed(2)}</strong></span>
+                  <span>{s.paymentBalanceDue}: <strong className="tabular-nums text-gray-800 dark:text-gray-200">{balanceDue.toFixed(2)}</strong></span>
+                </div>
+                <span className={cn('inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium', paymentStatusBadgeClass(invoice.payment_status ?? 'unpaid'))}>
+                  {paymentStatusLabel(invoice.payment_status ?? 'unpaid')}
+                </span>
+              </div>
+
+              {/* Payments list */}
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
+                {s.paymentsTitle}
+              </h3>
+
+              {payError && (
+                <div className="mb-2 flex items-center justify-between rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-900/20 dark:text-red-400">
+                  {payError}
+                  <button onClick={() => setPayError(null)} className="ml-2 underline opacity-70 hover:opacity-100">{s.close}</button>
+                </div>
+              )}
+
+              {paymentsLoading ? (
+                <p className="py-3 text-center text-xs text-gray-400">{s.loading}</p>
+              ) : payments.length === 0 ? (
+                <p className="py-3 text-center text-xs text-gray-400 dark:text-gray-500">{s.paymentsEmpty}</p>
+              ) : (
+                <div className="mb-3 rounded-lg border border-gray-100 dark:border-gray-800">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-gray-100 dark:border-gray-800">
+                        <th className="px-3 py-2 text-left font-medium text-gray-400">{s.paymentDate}</th>
+                        <th className="px-3 py-2 text-right font-medium text-gray-400">{s.paymentAmount}</th>
+                        <th className="px-3 py-2 text-left font-medium text-gray-400">{s.paymentMethod}</th>
+                        <th className="px-3 py-2 text-left font-medium text-gray-400">{s.fNote}</th>
+                        {canManage && <th className="px-3 py-2" />}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
+                      {payments.map((p) => (
+                        <tr key={p.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                          <td className="px-3 py-2 tabular-nums text-gray-500">{fmt(p.payment_date)}</td>
+                          <td className="px-3 py-2 text-right tabular-nums text-gray-900 dark:text-white">{Number(p.amount).toFixed(2)}</td>
+                          <td className="px-3 py-2 text-gray-500">{paymentMethodLabel(p.payment_method)}</td>
+                          <td className="px-3 py-2 text-gray-400">{p.note ?? '—'}</td>
+                          {canManage && (
+                            <td className="px-3 py-2">
+                              <button
+                                onClick={() => handleDeletePayment(p.id)}
+                                disabled={isDeletingPayment}
+                                className="text-xs text-gray-400 hover:text-red-500 disabled:opacity-50 dark:hover:text-red-400"
+                              >
+                                {s.deletePayment}
+                              </button>
+                            </td>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Record payment form */}
+              {canManage && balanceDue > 0 && (
+                <div className="rounded-lg border border-dashed border-gray-200 px-4 py-3 dark:border-gray-700">
+                  <p className="mb-2 text-xs font-medium text-gray-500 dark:text-gray-400">{s.recordPayment}</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      type="date"
+                      value={payForm.payment_date}
+                      onChange={(e) => setPayForm((f) => ({ ...f, payment_date: e.target.value }))}
+                      className="rounded border border-gray-200 px-2 py-1.5 text-xs focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                    />
+                    <input
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      max={balanceDue}
+                      placeholder={s.paymentAmount}
+                      value={payForm.amount}
+                      onChange={(e) => setPayForm((f) => ({ ...f, amount: e.target.value }))}
+                      className="w-28 rounded border border-gray-200 px-2 py-1.5 text-right text-xs focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white dark:placeholder-gray-500"
+                    />
+                    <select
+                      value={payForm.payment_method}
+                      onChange={(e) => setPayForm((f) => ({ ...f, payment_method: e.target.value as PaymentMethod }))}
+                      className="rounded border border-gray-200 px-2 py-1.5 text-xs focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                    >
+                      <option value="bank_transfer">{s.paymentMethodBankTransfer}</option>
+                      <option value="cash">{s.paymentMethodCash}</option>
+                      <option value="card">{s.paymentMethodCard}</option>
+                      <option value="other">{s.paymentMethodOther}</option>
+                    </select>
+                    <input
+                      type="text"
+                      placeholder={s.paymentNote}
+                      value={payForm.note}
+                      onChange={(e) => setPayForm((f) => ({ ...f, note: e.target.value }))}
+                      className="flex-1 rounded border border-gray-200 px-2 py-1.5 text-xs focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white dark:placeholder-gray-500"
+                    />
+                    <button
+                      onClick={handleRecordPayment}
+                      disabled={isRecording || !payForm.amount}
+                      className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      {isRecording ? s.saving : s.recordPayment}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Add item form */}
           {canManage && canEdit && (
