@@ -246,6 +246,16 @@ export function InvoicesClient({
                       >
                         {s.detail}
                       </button>
+                      {canManage && (item.status === 'issued' || item.status === 'cancelled') && (
+                        <a
+                          href={`/invoices/${item.id}/print`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-gray-500 hover:underline dark:text-gray-400"
+                        >
+                          {s.printBtn}
+                        </a>
+                      )}
                       {canManage && canEditInvoice(item) && (
                         <>
                           <button

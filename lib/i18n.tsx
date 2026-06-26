@@ -325,6 +325,7 @@ const dict = {
       successPayment: 'Плащането е записано',
       successPaymentDelete: 'Плащането е изтрито',
       deletePayment: 'Изтрий',
+      printBtn: 'Печат',
     },
     deliveries: {
       title: 'Входящи доставки',
@@ -876,6 +877,7 @@ const dict = {
       successPayment: 'Payment recorded',
       successPaymentDelete: 'Payment deleted',
       deletePayment: 'Delete',
+      printBtn: 'Print',
     },
     deliveries: {
       title: 'Incoming Deliveries',

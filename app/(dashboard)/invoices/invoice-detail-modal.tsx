@@ -362,6 +362,16 @@ export function InvoiceDetailModal({ invoice, products, canManage, canIssue, onC
                 {s.issueAction}
               </button>
             )}
+            {canManage && (invoice.status === 'issued' || invoice.status === 'cancelled') && (
+              <a
+                href={`/invoices/${invoice.id}/print`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
+              >
+                {s.printBtn}
+              </a>
+            )}
             <button
               onClick={() => onClose()}
               className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"

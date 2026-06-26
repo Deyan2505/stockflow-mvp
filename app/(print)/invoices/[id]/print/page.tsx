@@ -1,0 +1,287 @@
+export const dynamic = 'force-dynamic'
+
+import { notFound } from 'next/navigation'
+import Link from 'next/link'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { getCurrentRole } from '@/lib/current-user'
+import { can } from '@/lib/permissions'
+import { PrintButton } from './print-button'
+
+const CO = process.env.DEMO_COMPANY_ID!
+
+const fmtDate = (d?: string | null) =>
+  d ? d.split('-').reverse().join('.') : '—'
+
+const money = (v: number | string | null | undefined) =>
+  Number(v || 0).toFixed(2)
+
+const paymentStatusLabel = (status?: string | null) => {
+  if (status === 'paid') return 'Платена'
+  if (status === 'partially_paid') return 'Частично платена'
+  return 'Неплатена'
+}
+
+type CustomerJoin = {
+  id: string
+  name: string
+  email: string | null
+  phone: string | null
+} | null
+
+type OrderJoin = {
+  id: string
+  order_number: string
+  customer_name: string | null
+} | null
+
+type InvoiceRow = {
+  id: string
+  invoice_number: string
+  status: string
+  invoice_date: string
+  due_date: string | null
+  note: string | null
+  subtotal: number
+  vat_rate: number
+  vat_amount: number
+  total: number
+  amount_paid: number
+  payment_status: string
+  customers: CustomerJoin
+  outgoing_orders: OrderJoin
+}
+
+type ItemRow = {
+  id: string
+  description: string
+  quantity: number
+  unit_price: number
+  amount: number
+  products: { name: string; unit: string | null } | null
+}
+
+
+export default async function InvoicePrintPage({ params }: { params: { id: string } }) {
+  const role = await getCurrentRole()
+
+  if (!can(role, 'manage_invoices')) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-white p-8">
+        <div className="text-center">
+          <p className="text-sm text-gray-600">Нямате достъп до тази страница.</p>
+          <Link
+            href="/invoices"
+            className="mt-4 inline-block text-sm text-blue-600 underline"
+          >
+            ← Назад към фактури
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
+  const sb = createAdminClient()
+  const { id } = params
+
+  const [{ data: rawInvoice }, { data: rawItems }] = await Promise.all([
+    sb
+      .from('invoices')
+      .select('*, customers(id, name, email, phone), outgoing_orders(id, order_number, customer_name)')
+      .eq('id', id)
+      .eq('company_id', CO)
+      .single(),
+    sb
+      .from('invoice_items')
+      .select('*, products(name, unit)')
+      .eq('invoice_id', id)
+      .eq('company_id', CO)
+      .order('created_at', { ascending: true }),
+  ])
+
+  if (!rawInvoice) notFound()
+
+  const invoice = rawInvoice as unknown as InvoiceRow
+  const items = (rawItems ?? []) as unknown as ItemRow[]
+
+  const companyName = process.env.NEXT_PUBLIC_COMPANY_NAME || 'StockFlow MVP'
+  const customer = invoice.customers
+  const linkedOrder = invoice.outgoing_orders
+  const balanceDue = Math.max(
+    0,
+    Math.round((Number(invoice.total || 0) - Number(invoice.amount_paid || 0)) * 100) / 100,
+  )
+
+  return (
+    <>
+      <style>{`
+        @media print {
+          @page { margin: 1.5cm; size: A4; }
+          body {
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+            background: white !important;
+            color: black !important;
+          }
+        }
+      `}</style>
+
+      <div className="mx-auto max-w-3xl bg-white p-8 text-gray-900 print:p-0">
+
+        {/* Screen-only toolbar */}
+        <div className="mb-6 flex items-center gap-4 border-b border-gray-100 pb-4 print:hidden">
+          <PrintButton label="Печат / Запази PDF" />
+          <Link
+            href="/invoices"
+            className="text-sm text-gray-500 hover:underline"
+          >
+            ← Назад към фактури
+          </Link>
+        </div>
+
+        {/* Cancelled banner */}
+        {invoice.status === 'cancelled' && (
+          <div className="mb-6 rounded-lg border-2 border-red-500 bg-red-50 px-6 py-4 text-center">
+            <p className="text-lg font-bold tracking-wide text-red-700">
+              АНУЛИРАНА ФАКТУРА / CANCELLED INVOICE
+            </p>
+          </div>
+        )}
+
+        {/* Document header */}
+        <div className="mb-8 flex items-start justify-between">
+          <div>
+            <p className="text-xl font-bold text-gray-900">{companyName}</p>
+          </div>
+          <div className="text-right">
+            <p className="text-2xl font-bold text-gray-900">ФАКТУРА</p>
+            <p className="mt-1 text-sm text-gray-600">№ {invoice.invoice_number}</p>
+            <p className="text-sm text-gray-600">Дата: {fmtDate(invoice.invoice_date)}</p>
+            {invoice.due_date && (
+              <p className="text-sm text-gray-600">Краен срок: {fmtDate(invoice.due_date)}</p>
+            )}
+          </div>
+        </div>
+
+        {/* Customer section */}
+        <div className="mb-8 rounded-lg border border-gray-200 p-4">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+            До / Клиент
+          </p>
+          <p className="font-semibold text-gray-900">{customer?.name ?? '—'}</p>
+          {customer?.email && (
+            <p className="text-sm text-gray-600">{customer.email}</p>
+          )}
+          {customer?.phone && (
+            <p className="text-sm text-gray-600">{customer.phone}</p>
+          )}
+          {linkedOrder && (
+            <p className="mt-2 border-t border-gray-100 pt-2 text-xs text-gray-500">
+              Поръчка:{' '}
+              <span className="font-medium">{linkedOrder.order_number}</span>
+              {linkedOrder.customer_name ? ` — ${linkedOrder.customer_name}` : ''}
+            </p>
+          )}
+        </div>
+
+        {/* Items table */}
+        <table className="mb-8 w-full text-sm">
+          <thead>
+            <tr className="border-b-2 border-gray-300">
+              <th className="pb-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                #
+              </th>
+              <th className="pb-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Описание
+              </th>
+              <th className="pb-2 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Кол.
+              </th>
+              <th className="pb-2 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Ед. цена
+              </th>
+              <th className="pb-2 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Сума
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {items.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="py-4 text-center text-sm text-gray-400">
+                  Няма артикули
+                </td>
+              </tr>
+            ) : (
+              items.map((item, i) => (
+                <tr key={item.id}>
+                  <td className="py-2 pr-3 text-gray-400">{i + 1}</td>
+                  <td className="py-2 text-gray-900">{item.description}</td>
+                  <td className="py-2 text-right tabular-nums text-gray-700">{item.quantity}</td>
+                  <td className="py-2 text-right tabular-nums text-gray-700">
+                    {money(item.unit_price)}
+                  </td>
+                  <td className="py-2 text-right tabular-nums font-medium text-gray-900">
+                    {money(item.amount)}
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+
+        {/* Totals */}
+        <div className="mb-8 flex justify-end">
+          <div className="w-56 space-y-1 text-sm">
+            <div className="flex justify-between text-gray-600">
+              <span>Нето:</span>
+              <span className="tabular-nums">{money(invoice.subtotal)}</span>
+            </div>
+            <div className="flex justify-between text-gray-600">
+              <span>ДДС {invoice.vat_rate}%:</span>
+              <span className="tabular-nums">{money(invoice.vat_amount)}</span>
+            </div>
+            <div className="flex justify-between border-t-2 border-gray-300 pt-2 text-base font-bold text-gray-900">
+              <span>Общо:</span>
+              <span className="tabular-nums">{money(invoice.total)}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Payment summary — issued invoices only */}
+        {invoice.status === 'issued' && (
+          <div className="mb-8 rounded-lg border border-gray-200 p-4">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+              Статус на плащане
+            </p>
+            <div className="space-y-1 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-600">Статус:</span>
+                <span className="font-medium text-gray-900">
+                  {paymentStatusLabel(invoice.payment_status)}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Платено:</span>
+                <span className="tabular-nums text-gray-900">{money(invoice.amount_paid)}</span>
+              </div>
+              <div className="flex justify-between font-semibold">
+                <span className="text-gray-700">Остатък:</span>
+                <span className="tabular-nums text-gray-900">{money(balanceDue)}</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Note */}
+        {invoice.note && (
+          <div className="rounded-lg border border-gray-200 p-4">
+            <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">
+              Бележка
+            </p>
+            <p className="text-sm text-gray-700">{invoice.note}</p>
+          </div>
+        )}
+      </div>
+    </>
+  )
+}
