@@ -114,8 +114,18 @@ export function InvoiceDetailModal({ invoice, products, canManage, canIssue, onC
   }
 
   const round2Local = (n: number) => Math.round(n * 100) / 100
-  const amountPaid = round2Local(Number(invoice.amount_paid || 0))
-  const balanceDue = Math.max(0, round2Local(Number(invoice.total || 0) - amountPaid))
+  const invoiceTotal = round2Local(Number(invoice.total || 0))
+  // Derive payment summary from loaded payments array — not from stale invoice prop
+  const localAmountPaid = round2Local(
+    payments.reduce((sum, p) => sum + Number(p.amount || 0), 0)
+  )
+  const localBalanceDue = Math.max(0, round2Local(invoiceTotal - localAmountPaid))
+  const localPaymentStatus =
+    localAmountPaid === 0
+      ? 'unpaid'
+      : localAmountPaid >= invoiceTotal
+        ? 'paid'
+        : 'partially_paid'
 
   const subtotal = round2(items.reduce((sum, item) => sum + Number(item.amount), 0))
   const vatAmount = round2((subtotal * invoice.vat_rate) / 100)
@@ -592,11 +602,11 @@ export function InvoiceDetailModal({ invoice, products, canManage, canIssue, onC
               {/* Payment summary */}
               <div className="mb-3 flex items-center justify-between rounded-lg border border-gray-100 bg-gray-50/50 px-4 py-3 dark:border-gray-800 dark:bg-gray-800/30">
                 <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
-                  <span>{s.paymentAmountPaid}: <strong className="tabular-nums text-gray-800 dark:text-gray-200">{amountPaid.toFixed(2)}</strong></span>
-                  <span>{s.paymentBalanceDue}: <strong className="tabular-nums text-gray-800 dark:text-gray-200">{balanceDue.toFixed(2)}</strong></span>
+                  <span>{s.paymentAmountPaid}: <strong className="tabular-nums text-gray-800 dark:text-gray-200">{localAmountPaid.toFixed(2)}</strong></span>
+                  <span>{s.paymentBalanceDue}: <strong className="tabular-nums text-gray-800 dark:text-gray-200">{localBalanceDue.toFixed(2)}</strong></span>
                 </div>
-                <span className={cn('inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium', paymentStatusBadgeClass(invoice.payment_status ?? 'unpaid'))}>
-                  {paymentStatusLabel(invoice.payment_status ?? 'unpaid')}
+                <span className={cn('inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium', paymentStatusBadgeClass(localPaymentStatus))}>
+                  {paymentStatusLabel(localPaymentStatus)}
                 </span>
               </div>
 
@@ -654,7 +664,7 @@ export function InvoiceDetailModal({ invoice, products, canManage, canIssue, onC
               )}
 
               {/* Record payment form */}
-              {canManage && balanceDue > 0 && (
+              {canManage && localBalanceDue > 0 && (
                 <div className="rounded-lg border border-dashed border-gray-200 px-4 py-3 dark:border-gray-700">
                   <p className="mb-2 text-xs font-medium text-gray-500 dark:text-gray-400">{s.recordPayment}</p>
                   <div className="flex flex-wrap items-center gap-2">
@@ -668,7 +678,7 @@ export function InvoiceDetailModal({ invoice, products, canManage, canIssue, onC
                       type="number"
                       min="0.01"
                       step="0.01"
-                      max={balanceDue}
+                      max={localBalanceDue}
                       placeholder={s.paymentAmount}
                       value={payForm.amount}
                       onChange={(e) => setPayForm((f) => ({ ...f, amount: e.target.value }))}
