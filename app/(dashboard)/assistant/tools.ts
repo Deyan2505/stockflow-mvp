@@ -55,7 +55,7 @@ export const TOOL_SCHEMAS = [
     function: {
       name: 'get_low_stock',
       description:
-        'List products whose available quantity is below their minimum quantity threshold. Use for "what needs restocking", "what is running low".',
+        'List products and locations where the available quantity is below the product minimum quantity threshold. Uses per-location comparison — same logic as the Inventory page. ALWAYS call this tool for questions about low stock, "под минимум", running low, or what needs restocking. If the tool returns count: 0 only then say there are no low-stock items. If it returns items, list them all.',
       parameters: { type: 'object', properties: {} },
     },
   },
@@ -355,49 +355,44 @@ async function getLowStock() {
 
   const sb = createAdminClient()
 
-  // Fetch all products with min_quantity > 0
-  const { data: products, error: pErr } = await sb
-    .from('products')
-    .select('id, name, unit, category, min_quantity')
-    .eq('company_id', CO)
-    .eq('status', 'active')
-    .gt('min_quantity', 0)
-
-  if (pErr) throw new Error(pErr.message)
-
-  // Fetch inventory balances
-  const { data: balances, error: bErr } = await sb
+  // Per-location comparison — matches the Inventory page stockStatus(qty, min) logic:
+  //   if (min > 0 && qty < min) → "low"
+  // We fetch all balance rows and filter in JS because PostgREST cannot filter
+  // on embedded-join columns directly.
+  const { data, error } = await sb
     .from('inventory_balances')
-    .select('product_id, quantity_available')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .select('quantity_available, product_id, products(name, unit, min_quantity), locations(code, warehouses(name))' as any)
     .eq('company_id', CO)
 
-  if (bErr) throw new Error(bErr.message)
+  if (error) throw new Error(error.message)
 
-  // Aggregate available qty by product
-  const qtyByProduct = new Map<string, number>()
-  for (const b of balances ?? []) {
-    qtyByProduct.set(
-      b.product_id,
-      (qtyByProduct.get(b.product_id) ?? 0) + Number(b.quantity_available),
-    )
-  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rows = (data ?? []) as any[]
 
-  const lowStock = (products ?? [])
-    .map((p) => ({
-      name: p.name,
-      unit: p.unit,
-      category: p.category ?? null,
-      available: qtyByProduct.get(p.id) ?? 0,
-      min_quantity: Number(p.min_quantity),
-      shortage: Number(p.min_quantity) - (qtyByProduct.get(p.id) ?? 0),
+  const lowItems = rows
+    .filter((r) => {
+      const min = Number(r.products?.min_quantity ?? 0)
+      const qty = Number(r.quantity_available)
+      return min > 0 && qty < min
+    })
+    .map((r) => ({
+      product: r.products?.name ?? 'Unknown',
+      unit: r.products?.unit ?? '',
+      location: r.locations?.code ?? 'Unknown',
+      warehouse: r.locations?.warehouses?.name ?? 'Unknown',
+      available: Number(r.quantity_available),
+      min_quantity: Number(r.products?.min_quantity ?? 0),
+      shortage: Number(r.products?.min_quantity ?? 0) - Number(r.quantity_available),
     }))
-    .filter((p) => p.available < p.min_quantity)
     .sort((a, b) => b.shortage - a.shortage)
     .slice(0, LIMIT)
 
   return {
-    low_stock_products: lowStock,
-    count: lowStock.length,
+    low_stock_items: lowItems,
+    count: lowItems.length,
+    limited: lowItems.length >= LIMIT,
+    limit: LIMIT,
   }
 }
 

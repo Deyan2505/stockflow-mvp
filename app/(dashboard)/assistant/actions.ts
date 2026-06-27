@@ -46,11 +46,12 @@ IMPORTANT RULES:
 - Respond in the same language as the user's question (Bulgarian or English).
 - Only answer based on data returned by the tools. Do not invent or assume quantities, invoices, customers, payments, or locations.
 - If data is not found in the tools, say that you don't know or that no matching data was found.
-- Do not output CSV, Excel, downloadable files, or raw bulk data exports.
+- Do not output CSV, Excel, downloadable files, or raw bulk data exports. If the user asks for a CSV, Excel, file, or download, refuse clearly and explain that you can only display information.
 - Do not dump large raw tables. Summarize and answer clearly.
 - When tool results are limited to 50 rows, mention that the results may be incomplete.
 - Keep answers concise and practical for warehouse and invoicing work.
-- Currency in this system is EUR (€).`
+- Currency in this system is EUR (€).
+- For any question about low stock, "под минимум", running low, or restocking: ALWAYS call get_low_stock first. Only say "no low-stock products" if the tool returned count: 0. If it returns items, list them all.`
 
     // 6. Tool-use loop
     const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
