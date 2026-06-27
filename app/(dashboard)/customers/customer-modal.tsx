@@ -117,9 +117,16 @@ export function CustomerModal({ customer, onClose }: Props) {
               />
             </div>
 
+            {/* Billing details section */}
+            <div className="col-span-2 mt-2 border-t border-gray-100 pt-3 dark:border-gray-800">
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
+                {s.billingDetails}
+              </p>
+            </div>
+
             {/* Address — full width */}
             <div className="col-span-2">
-              <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">{s.fAddress}</label>
+              <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">{s.address}</label>
               <input
                 type="text"
                 value={form.address ?? ''}
@@ -131,7 +138,7 @@ export function CustomerModal({ customer, onClose }: Props) {
 
             {/* EIK */}
             <div>
-              <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">{s.fEIK}</label>
+              <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">{s.eik}</label>
               <input
                 type="text"
                 value={form.eik ?? ''}
@@ -143,7 +150,7 @@ export function CustomerModal({ customer, onClose }: Props) {
 
             {/* VAT number */}
             <div>
-              <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">{s.fVATNumber}</label>
+              <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">{s.vatNumber}</label>
               <input
                 type="text"
                 value={form.vat_number ?? ''}
@@ -155,7 +162,7 @@ export function CustomerModal({ customer, onClose }: Props) {
 
             {/* MOL — full width */}
             <div className="col-span-2">
-              <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">{s.fMOL}</label>
+              <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">{s.mol}</label>
               <input
                 type="text"
                 value={form.mol ?? ''}

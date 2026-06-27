@@ -148,17 +148,19 @@ export default async function InvoicePrintPage({ params }: { params: { id: strin
   const invoice = rawInvoice as unknown as InvoiceRow
   const items   = (rawItems ?? []) as unknown as ItemRow[]
 
-  // Issuer identity — env vars, all optional
-  const companyName    = process.env.NEXT_PUBLIC_COMPANY_NAME    || 'StockFlow Demo'
-  const companyAddress = process.env.NEXT_PUBLIC_COMPANY_ADDRESS  || null
-  const companyEIK     = process.env.NEXT_PUBLIC_COMPANY_EIK      || null
-  const companyVAT     = process.env.NEXT_PUBLIC_COMPANY_VAT      || null
-  const companyMOL     = process.env.NEXT_PUBLIC_COMPANY_MOL      || null
-  const companyEmail   = process.env.NEXT_PUBLIC_COMPANY_EMAIL    || null
-  const companyPhone   = process.env.NEXT_PUBLIC_COMPANY_PHONE    || null
-  const companyBank    = process.env.NEXT_PUBLIC_COMPANY_BANK     || null
-  const companyIBAN    = process.env.NEXT_PUBLIC_COMPANY_IBAN     || null
-  const companyBIC     = process.env.NEXT_PUBLIC_COMPANY_BIC      || null
+  // Issuer identity — env vars, all optional (empty string = omit the line)
+  const issuer = {
+    name:    process.env.NEXT_PUBLIC_COMPANY_NAME    || 'StockFlow Demo',
+    address: process.env.NEXT_PUBLIC_COMPANY_ADDRESS || '',
+    eik:     process.env.NEXT_PUBLIC_COMPANY_EIK     || '',
+    vat:     process.env.NEXT_PUBLIC_COMPANY_VAT     || '',
+    mol:     process.env.NEXT_PUBLIC_COMPANY_MOL     || '',
+    email:   process.env.NEXT_PUBLIC_COMPANY_EMAIL   || '',
+    phone:   process.env.NEXT_PUBLIC_COMPANY_PHONE   || '',
+    bank:    process.env.NEXT_PUBLIC_COMPANY_BANK    || '',
+    iban:    process.env.NEXT_PUBLIC_COMPANY_IBAN    || '',
+    bic:     process.env.NEXT_PUBLIC_COMPANY_BIC     || '',
+  }
 
   const customer    = invoice.customers
   const linkedOrder = invoice.outgoing_orders
@@ -206,13 +208,13 @@ export default async function InvoicePrintPage({ params }: { params: { id: strin
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
               От / Издател
             </p>
-            <p className="font-semibold text-gray-900">{companyName}</p>
-            {companyAddress && <p className="text-sm text-gray-600">{companyAddress}</p>}
-            {companyEIK     && <p className="text-sm text-gray-600">ЕИК: {companyEIK}</p>}
-            {companyVAT     && <p className="text-sm text-gray-600">ДДС №: {companyVAT}</p>}
-            {companyMOL     && <p className="text-sm text-gray-600">МОЛ: {companyMOL}</p>}
-            {companyEmail   && <p className="text-sm text-gray-600">{companyEmail}</p>}
-            {companyPhone   && <p className="text-sm text-gray-600">{companyPhone}</p>}
+            <p className="font-semibold text-gray-900">{issuer.name}</p>
+            {issuer.address && <p className="text-sm text-gray-600">{issuer.address}</p>}
+            {issuer.eik     && <p className="text-sm text-gray-600">ЕИК: {issuer.eik}</p>}
+            {issuer.vat     && <p className="text-sm text-gray-600">ДДС №: {issuer.vat}</p>}
+            {issuer.mol     && <p className="text-sm text-gray-600">МОЛ: {issuer.mol}</p>}
+            {issuer.email   && <p className="text-sm text-gray-600">{issuer.email}</p>}
+            {issuer.phone   && <p className="text-sm text-gray-600">{issuer.phone}</p>}
           </div>
           <div className="text-right">
             <p className="text-2xl font-bold text-gray-900">ФАКТУРА</p>
@@ -335,20 +337,20 @@ export default async function InvoicePrintPage({ params }: { params: { id: strin
         <div className="mt-8 border-t-2 border-gray-300 pt-4">
           <div className="grid grid-cols-3 gap-4 text-xs text-gray-600">
             <div>
-              <p className="font-semibold text-gray-900">{companyName}</p>
-              {companyEIK  && <p>ЕИК: {companyEIK}</p>}
-              {companyVAT  && <p>ДДС №: {companyVAT}</p>}
-              {companyMOL  && <p>МОЛ: {companyMOL}</p>}
+              <p className="font-semibold text-gray-900">{issuer.name}</p>
+              {issuer.eik  && <p>ЕИК: {issuer.eik}</p>}
+              {issuer.vat  && <p>ДДС №: {issuer.vat}</p>}
+              {issuer.mol  && <p>МОЛ: {issuer.mol}</p>}
             </div>
             <div>
-              {companyAddress && <p>{companyAddress}</p>}
-              {companyPhone   && <p>Тел.: {companyPhone}</p>}
-              {companyEmail   && <p>{companyEmail}</p>}
+              {issuer.address && <p>{issuer.address}</p>}
+              {issuer.phone   && <p>Тел.: {issuer.phone}</p>}
+              {issuer.email   && <p>{issuer.email}</p>}
             </div>
             <div>
-              {companyBank && <p>{companyBank}</p>}
-              {companyIBAN && <p>IBAN: {companyIBAN}</p>}
-              {companyBIC  && <p>BIC/SWIFT: {companyBIC}</p>}
+              {issuer.bank && <p>{issuer.bank}</p>}
+              {issuer.iban && <p>IBAN: {issuer.iban}</p>}
+              {issuer.bic  && <p>BIC/SWIFT: {issuer.bic}</p>}
             </div>
           </div>
         </div>
