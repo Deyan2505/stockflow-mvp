@@ -13,10 +13,18 @@ type Props = {
 }
 
 function toInput(c: Customer): CustomerInput {
-  return { name: c.name, email: c.email, phone: c.phone, note: c.note }
+  return {
+    name: c.name, email: c.email, phone: c.phone,
+    address: c.address, eik: c.eik, vat_number: c.vat_number, mol: c.mol,
+    note: c.note,
+  }
 }
 
-const empty: CustomerInput = { name: '', email: null, phone: null, note: null }
+const empty: CustomerInput = {
+  name: '', email: null, phone: null,
+  address: null, eik: null, vat_number: null, mol: null,
+  note: null,
+}
 
 export function CustomerModal({ customer, onClose }: Props) {
   const { t } = useT()
@@ -106,6 +114,54 @@ export function CustomerModal({ customer, onClose }: Props) {
                 onChange={(e) => set('phone', e.target.value)}
                 className={inputClass}
                 placeholder="+359 88 888 8888"
+              />
+            </div>
+
+            {/* Address — full width */}
+            <div className="col-span-2">
+              <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">{s.fAddress}</label>
+              <input
+                type="text"
+                value={form.address ?? ''}
+                onChange={(e) => set('address', e.target.value)}
+                className={inputClass}
+                placeholder="ул. Примерна 1, 1000 София"
+              />
+            </div>
+
+            {/* EIK */}
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">{s.fEIK}</label>
+              <input
+                type="text"
+                value={form.eik ?? ''}
+                onChange={(e) => set('eik', e.target.value)}
+                className={inputClass}
+                placeholder="123456789"
+              />
+            </div>
+
+            {/* VAT number */}
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">{s.fVATNumber}</label>
+              <input
+                type="text"
+                value={form.vat_number ?? ''}
+                onChange={(e) => set('vat_number', e.target.value)}
+                className={inputClass}
+                placeholder="BG123456789"
+              />
+            </div>
+
+            {/* MOL — full width */}
+            <div className="col-span-2">
+              <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">{s.fMOL}</label>
+              <input
+                type="text"
+                value={form.mol ?? ''}
+                onChange={(e) => set('mol', e.target.value)}
+                className={inputClass}
+                placeholder="Иван Иванов"
               />
             </div>
 

@@ -12,6 +12,10 @@ export type Customer = {
   name: string
   email: string | null
   phone: string | null
+  address: string | null
+  eik: string | null
+  vat_number: string | null
+  mol: string | null
   note: string | null
   status: string
   created_at: string
@@ -22,6 +26,10 @@ export type CustomerInput = {
   name: string
   email: string | null
   phone: string | null
+  address: string | null
+  eik: string | null
+  vat_number: string | null
+  mol: string | null
   note: string | null
 }
 
@@ -32,11 +40,15 @@ export async function createCustomer(input: CustomerInput): Promise<CustomerResu
     await requirePermission('manage_customers')
     const sb = createAdminClient()
     const { error } = await sb.from('customers').insert({
-      company_id: CO,
-      name: input.name.trim(),
-      email: input.email?.trim() || null,
-      phone: input.phone?.trim() || null,
-      note: input.note?.trim() || null,
+      company_id:  CO,
+      name:        input.name.trim(),
+      email:       input.email?.trim()       || null,
+      phone:       input.phone?.trim()       || null,
+      address:     input.address?.trim()     || null,
+      eik:         input.eik?.trim()         || null,
+      vat_number:  input.vat_number?.trim()  || null,
+      mol:         input.mol?.trim()         || null,
+      note:        input.note?.trim()        || null,
       status: 'active',
     })
     if (error) {
@@ -57,10 +69,14 @@ export async function updateCustomer(id: string, input: CustomerInput): Promise<
     const { error } = await sb
       .from('customers')
       .update({
-        name: input.name.trim(),
-        email: input.email?.trim() || null,
-        phone: input.phone?.trim() || null,
-        note: input.note?.trim() || null,
+        name:        input.name.trim(),
+        email:       input.email?.trim()       || null,
+        phone:       input.phone?.trim()       || null,
+        address:     input.address?.trim()     || null,
+        eik:         input.eik?.trim()         || null,
+        vat_number:  input.vat_number?.trim()  || null,
+        mol:         input.mol?.trim()         || null,
+        note:        input.note?.trim()        || null,
       })
       .eq('id', id)
       .eq('company_id', CO)

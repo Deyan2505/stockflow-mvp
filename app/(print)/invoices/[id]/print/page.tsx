@@ -13,7 +13,7 @@ const fmtDate = (d?: string | null) =>
   d ? d.split('-').reverse().join('.') : '—'
 
 const money = (v: number | string | null | undefined) =>
-  Number(v || 0).toFixed(2)
+  `${Number(v || 0).toFixed(2)} €`
 
 const paymentStatusLabel = (status?: string | null) => {
   if (status === 'paid') return 'Платена'
@@ -21,11 +21,60 @@ const paymentStatusLabel = (status?: string | null) => {
   return 'Неплатена'
 }
 
+// Bulgarian amount-in-words for EUR (MVP: numeric cents, words for euros only)
+function amountInWords(total: number): string {
+  const totalCents = Math.round(total * 100)
+  const euros = Math.floor(totalCents / 100)
+  const cents = totalCents % 100
+
+  const ONES  = ['', 'едно', 'две', 'три', 'четири', 'пет', 'шест', 'седем', 'осем', 'девет']
+  const TEENS = ['десет', 'единадесет', 'дванадесет', 'тринадесет', 'четиринадесет',
+                 'петнадесет', 'шестнадесет', 'седемнадесет', 'осемнадесет', 'деветнадесет']
+  const TENS  = ['', '', 'двадесет', 'тридесет', 'четиридесет', 'петдесет',
+                 'шестдесет', 'седемдесет', 'осемдесет', 'деветдесет']
+  const HUNDS = ['', 'сто', 'двеста', 'триста', 'четиристотин', 'петстотин',
+                 'шестстотин', 'седемстотин', 'осемстотин', 'деветстотин']
+
+  const sub100 = (n: number): string => {
+    if (n === 0) return ''
+    if (n < 10) return ONES[n]
+    if (n < 20) return TEENS[n - 10]
+    const o = n % 10
+    return o ? `${TENS[Math.floor(n / 10)]} и ${ONES[o]}` : TENS[Math.floor(n / 10)]
+  }
+
+  const sub1000 = (n: number): string => {
+    const h = Math.floor(n / 100)
+    const r = n % 100
+    if (!h) return sub100(r)
+    if (!r) return HUNDS[h]
+    return `${HUNDS[h]}${r < 20 ? ' и ' : ' '}${sub100(r)}`
+  }
+
+  if (!euros) return `НУЛА ЕВРО${cents ? ` И ${cents} ЦЕНТА` : ''}`
+
+  const th  = Math.floor(euros / 1000)
+  const rem = euros % 1000
+  const parts: string[] = []
+
+  if (th) parts.push(th === 1 ? 'хиляда' : `${sub100(th)} хиляди`)
+  if (rem) parts.push(sub1000(rem))
+
+  const sep = th && rem && rem < 100 ? ' и ' : ' '
+  const euroWords = (th && rem ? parts.join(sep) : parts.join('')).trim()
+
+  return `${euroWords.toUpperCase()} ЕВРО${cents ? ` И ${cents} ЦЕНТА` : ''}`
+}
+
 type CustomerJoin = {
   id: string
   name: string
   email: string | null
   phone: string | null
+  address: string | null
+  eik: string | null
+  vat_number: string | null
+  mol: string | null
 } | null
 
 type OrderJoin = {
@@ -60,7 +109,6 @@ type ItemRow = {
   products: { name: string; unit: string | null } | null
 }
 
-
 export default async function InvoicePrintPage({ params }: { params: { id: string } }) {
   const role = await getCurrentRole()
 
@@ -69,10 +117,7 @@ export default async function InvoicePrintPage({ params }: { params: { id: strin
       <div className="flex min-h-screen items-center justify-center bg-white p-8">
         <div className="text-center">
           <p className="text-sm text-gray-600">Нямате достъп до тази страница.</p>
-          <Link
-            href="/invoices"
-            className="mt-4 inline-block text-sm text-blue-600 underline"
-          >
+          <Link href="/invoices" className="mt-4 inline-block text-sm text-blue-600 underline">
             ← Назад към фактури
           </Link>
         </div>
@@ -86,7 +131,7 @@ export default async function InvoicePrintPage({ params }: { params: { id: strin
   const [{ data: rawInvoice }, { data: rawItems }] = await Promise.all([
     sb
       .from('invoices')
-      .select('*, customers(id, name, email, phone), outgoing_orders(id, order_number, customer_name)')
+      .select('*, customers(id, name, email, phone, address, eik, vat_number, mol), outgoing_orders(id, order_number, customer_name)')
       .eq('id', id)
       .eq('company_id', CO)
       .single(),
@@ -101,17 +146,23 @@ export default async function InvoicePrintPage({ params }: { params: { id: strin
   if (!rawInvoice) notFound()
 
   const invoice = rawInvoice as unknown as InvoiceRow
-  const items = (rawItems ?? []) as unknown as ItemRow[]
+  const items   = (rawItems ?? []) as unknown as ItemRow[]
 
+  // Issuer identity — env vars, all optional
   const companyName    = process.env.NEXT_PUBLIC_COMPANY_NAME    || 'StockFlow Demo'
   const companyAddress = process.env.NEXT_PUBLIC_COMPANY_ADDRESS  || null
   const companyEIK     = process.env.NEXT_PUBLIC_COMPANY_EIK      || null
   const companyVAT     = process.env.NEXT_PUBLIC_COMPANY_VAT      || null
+  const companyMOL     = process.env.NEXT_PUBLIC_COMPANY_MOL      || null
   const companyEmail   = process.env.NEXT_PUBLIC_COMPANY_EMAIL    || null
   const companyPhone   = process.env.NEXT_PUBLIC_COMPANY_PHONE    || null
-  const customer = invoice.customers
+  const companyBank    = process.env.NEXT_PUBLIC_COMPANY_BANK     || null
+  const companyIBAN    = process.env.NEXT_PUBLIC_COMPANY_IBAN     || null
+  const companyBIC     = process.env.NEXT_PUBLIC_COMPANY_BIC      || null
+
+  const customer    = invoice.customers
   const linkedOrder = invoice.outgoing_orders
-  const balanceDue = Math.max(
+  const balanceDue  = Math.max(
     0,
     Math.round((Number(invoice.total || 0) - Number(invoice.amount_paid || 0)) * 100) / 100,
   )
@@ -135,10 +186,7 @@ export default async function InvoicePrintPage({ params }: { params: { id: strin
         {/* Screen-only toolbar */}
         <div className="mb-6 flex items-center gap-4 border-b border-gray-100 pb-4 print:hidden">
           <PrintButton label="Печат / Запази PDF" />
-          <Link
-            href="/invoices"
-            className="text-sm text-gray-500 hover:underline"
-          >
+          <Link href="/invoices" className="text-sm text-gray-500 hover:underline">
             ← Назад към фактури
           </Link>
         </div>
@@ -162,13 +210,16 @@ export default async function InvoicePrintPage({ params }: { params: { id: strin
             {companyAddress && <p className="text-sm text-gray-600">{companyAddress}</p>}
             {companyEIK     && <p className="text-sm text-gray-600">ЕИК: {companyEIK}</p>}
             {companyVAT     && <p className="text-sm text-gray-600">ДДС №: {companyVAT}</p>}
+            {companyMOL     && <p className="text-sm text-gray-600">МОЛ: {companyMOL}</p>}
             {companyEmail   && <p className="text-sm text-gray-600">{companyEmail}</p>}
             {companyPhone   && <p className="text-sm text-gray-600">{companyPhone}</p>}
           </div>
           <div className="text-right">
             <p className="text-2xl font-bold text-gray-900">ФАКТУРА</p>
-            <p className="mt-1 text-sm text-gray-600">№ {invoice.invoice_number}</p>
-            <p className="text-sm text-gray-600">Дата: {fmtDate(invoice.invoice_date)}</p>
+            <p className="text-xs text-gray-400">(Оригинал)</p>
+            <p className="mt-2 text-sm text-gray-600">№ {invoice.invoice_number}</p>
+            <p className="text-sm text-gray-600">Дата на издаване: {fmtDate(invoice.invoice_date)}</p>
+            <p className="text-sm text-gray-600">Данъчно събитие: {fmtDate(invoice.invoice_date)}</p>
             {invoice.due_date && (
               <p className="text-sm text-gray-600">Краен срок: {fmtDate(invoice.due_date)}</p>
             )}
@@ -181,12 +232,12 @@ export default async function InvoicePrintPage({ params }: { params: { id: strin
             До / Получател
           </p>
           <p className="font-semibold text-gray-900">{customer?.name ?? '—'}</p>
-          {customer?.email && (
-            <p className="text-sm text-gray-600">{customer.email}</p>
-          )}
-          {customer?.phone && (
-            <p className="text-sm text-gray-600">{customer.phone}</p>
-          )}
+          {customer?.address    && <p className="text-sm text-gray-600">{customer.address}</p>}
+          {customer?.eik        && <p className="text-sm text-gray-600">ЕИК: {customer.eik}</p>}
+          {customer?.vat_number && <p className="text-sm text-gray-600">ДДС №: {customer.vat_number}</p>}
+          {customer?.mol        && <p className="text-sm text-gray-600">МОЛ: {customer.mol}</p>}
+          {customer?.email      && <p className="text-sm text-gray-600">{customer.email}</p>}
+          {customer?.phone      && <p className="text-sm text-gray-600">{customer.phone}</p>}
           {linkedOrder && (
             <p className="mt-2 border-t border-gray-100 pt-2 text-xs text-gray-500">
               Поръчка:{' '}
@@ -197,32 +248,20 @@ export default async function InvoicePrintPage({ params }: { params: { id: strin
         </div>
 
         {/* Items table */}
-        <table className="mb-8 w-full text-sm">
+        <table className="mb-2 w-full text-sm">
           <thead>
             <tr className="border-b-2 border-gray-300">
-              <th className="pb-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                #
-              </th>
-              <th className="pb-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                Описание
-              </th>
-              <th className="pb-2 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">
-                Кол.
-              </th>
-              <th className="pb-2 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">
-                Ед. цена
-              </th>
-              <th className="pb-2 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">
-                Сума
-              </th>
+              <th className="pb-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">#</th>
+              <th className="pb-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Описание</th>
+              <th className="pb-2 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Кол.</th>
+              <th className="pb-2 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Ед. цена</th>
+              <th className="pb-2 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Сума</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {items.length === 0 ? (
               <tr>
-                <td colSpan={5} className="py-4 text-center text-sm text-gray-400">
-                  Няма артикули
-                </td>
+                <td colSpan={5} className="py-4 text-center text-sm text-gray-400">Няма артикули</td>
               </tr>
             ) : (
               items.map((item, i) => (
@@ -230,21 +269,22 @@ export default async function InvoicePrintPage({ params }: { params: { id: strin
                   <td className="py-2 pr-3 text-gray-400">{i + 1}</td>
                   <td className="py-2 text-gray-900">{item.description}</td>
                   <td className="py-2 text-right tabular-nums text-gray-700">{item.quantity}</td>
-                  <td className="py-2 text-right tabular-nums text-gray-700">
-                    {money(item.unit_price)}
-                  </td>
-                  <td className="py-2 text-right tabular-nums font-medium text-gray-900">
-                    {money(item.amount)}
-                  </td>
+                  <td className="py-2 text-right tabular-nums text-gray-700">{money(item.unit_price)}</td>
+                  <td className="py-2 text-right tabular-nums font-medium text-gray-900">{money(item.amount)}</td>
                 </tr>
               ))
             )}
           </tbody>
         </table>
 
+        {/* Amount in words */}
+        <p className="mb-6 border-t border-gray-100 pt-2 text-xs uppercase tracking-wide text-gray-400">
+          {amountInWords(Number(invoice.total || 0))}
+        </p>
+
         {/* Totals */}
         <div className="mb-8 flex justify-end">
-          <div className="w-56 space-y-1 text-sm">
+          <div className="w-64 space-y-1 text-sm">
             <div className="flex justify-between text-gray-600">
               <span>Нето:</span>
               <span className="tabular-nums">{money(invoice.subtotal)}</span>
@@ -254,7 +294,7 @@ export default async function InvoicePrintPage({ params }: { params: { id: strin
               <span className="tabular-nums">{money(invoice.vat_amount)}</span>
             </div>
             <div className="flex justify-between border-t-2 border-gray-300 pt-2 text-base font-bold text-gray-900">
-              <span>Общо:</span>
+              <span>Сума за плащане:</span>
               <span className="tabular-nums">{money(invoice.total)}</span>
             </div>
           </div>
@@ -269,9 +309,7 @@ export default async function InvoicePrintPage({ params }: { params: { id: strin
             <div className="space-y-1 text-sm">
               <div className="flex justify-between">
                 <span className="text-gray-600">Статус:</span>
-                <span className="font-medium text-gray-900">
-                  {paymentStatusLabel(invoice.payment_status)}
-                </span>
+                <span className="font-medium text-gray-900">{paymentStatusLabel(invoice.payment_status)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Платено:</span>
@@ -287,13 +325,46 @@ export default async function InvoicePrintPage({ params }: { params: { id: strin
 
         {/* Note */}
         {invoice.note && (
-          <div className="rounded-lg border border-gray-200 p-4">
-            <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">
-              Бележка
-            </p>
+          <div className="mb-8 rounded-lg border border-gray-200 p-4">
+            <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Бележка</p>
             <p className="text-sm text-gray-700">{invoice.note}</p>
           </div>
         )}
+
+        {/* Footer: company + bank details */}
+        <div className="mt-8 border-t-2 border-gray-300 pt-4">
+          <div className="grid grid-cols-3 gap-4 text-xs text-gray-600">
+            <div>
+              <p className="font-semibold text-gray-900">{companyName}</p>
+              {companyEIK  && <p>ЕИК: {companyEIK}</p>}
+              {companyVAT  && <p>ДДС №: {companyVAT}</p>}
+              {companyMOL  && <p>МОЛ: {companyMOL}</p>}
+            </div>
+            <div>
+              {companyAddress && <p>{companyAddress}</p>}
+              {companyPhone   && <p>Тел.: {companyPhone}</p>}
+              {companyEmail   && <p>{companyEmail}</p>}
+            </div>
+            <div>
+              {companyBank && <p>{companyBank}</p>}
+              {companyIBAN && <p>IBAN: {companyIBAN}</p>}
+              {companyBIC  && <p>BIC/SWIFT: {companyBIC}</p>}
+            </div>
+          </div>
+        </div>
+
+        {/* Signatures */}
+        <div className="mt-8 grid grid-cols-2 gap-8 border-t border-gray-100 pt-6 text-xs text-gray-500">
+          <div>
+            <p className="mb-6">Съставил: _______________________</p>
+            <p>(подпис и печат)</p>
+          </div>
+          <div>
+            <p className="mb-6">Получател: ______________________</p>
+            <p>(подпис и печат)</p>
+          </div>
+        </div>
+
       </div>
     </>
   )
