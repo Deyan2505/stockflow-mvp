@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useRef, useEffect } from 'react'
 import { Send, Bot } from 'lucide-react'
-import { askAssistant } from './actions'
+import { askAssistant, type AssistantMessage } from './actions'
 import { useT } from '@/lib/i18n'
 
 type Message = {
@@ -30,10 +30,21 @@ export function AssistantClient() {
     if (!q || isPending) return
 
     setInput('')
+
+    // Build history from current messages BEFORE updating state.
+    // Exclude error messages — they are UI-only and not real conversation turns.
+    const history: AssistantMessage[] = messages
+      .filter((m) => !m.isError)
+      .map((m) => ({ role: m.role, content: m.text }))
+
+    // Full message array passed to the server: history + new question
+    const payload: AssistantMessage[] = [...history, { role: 'user', content: q }]
+
+    // Add user message to UI
     setMessages((prev) => [...prev, { role: 'user', text: q }])
 
     startTransition(async () => {
-      const result = await askAssistant(q)
+      const result = await askAssistant(payload)
 
       if (result.success) {
         setMessages((prev) => [...prev, { role: 'assistant', text: result.answer }])
