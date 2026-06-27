@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
-  LayoutDashboard, Package, Warehouse, MapPin, ArrowRightLeft, BarChart3, Truck, ClipboardList, TrendingDown, ScanLine, ShoppingCart, Users, FileText, LogOut,
+  LayoutDashboard, Package, Warehouse, MapPin, ArrowRightLeft, BarChart3, Truck, ClipboardList, TrendingDown, ScanLine, ShoppingCart, Users, FileText, Sparkles, LogOut,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ThemeToggle } from './theme-toggle'
@@ -29,6 +29,7 @@ export function Sidebar() {
     { name: t.nav.deliveries, href: '/deliveries', icon: ClipboardList   },
     { name: t.nav.orders,     href: '/orders',     icon: ShoppingCart    },
     { name: t.nav.reports,    href: '/reports',    icon: TrendingDown    },
+    { name: t.nav.assistant,  href: '/assistant',  icon: Sparkles        },
   ]
 
   return (

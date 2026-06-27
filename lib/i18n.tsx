@@ -18,6 +18,7 @@ const dict = {
       deliveries: 'Доставки',
       orders: 'Изходящи поръчки',
       reports: 'Справки',
+      assistant: 'Асистент',
       version: 'MVP · v0.5',
       logout: 'Изход',
     },
@@ -560,6 +561,25 @@ const dict = {
     common: {
       readOnly: 'Само за четене',
     },
+    assistant: {
+      title: 'AI Асистент',
+      subtitle: 'Задавайте въпроси за данните в системата. Асистентът е само за четене и не може да прави промени.',
+      placeholder: 'Задайте въпрос... (напр. Кои фактури са неплатени?)',
+      send: 'Изпрати',
+      sending: 'Изпращане…',
+      clear: 'Изчисти',
+      errGeneric: 'Нещо се обърка. Опитайте отново.',
+      errTimeout: 'Асистентът не успя да отговори навреме. Опитайте отново.',
+      errLong: 'Въпросът е твърде дълъг. Максимум 500 символа.',
+      errNotConfigured: 'AI асистентът не е конфигуриран за момента.',
+      suggestions: [
+        'Кои продукти са на изчерпване?',
+        'Колко броя Фланелки имаме и къде се намират?',
+        'Кои фактури са неплатени?',
+        'Кои поръчки са отворени?',
+        'Каква е общата стойност на наличността?',
+      ],
+    },
   },
 
   en: {
@@ -573,6 +593,7 @@ const dict = {
       deliveries: 'Deliveries',
       orders: 'Outgoing Orders',
       reports: 'Reports',
+      assistant: 'Assistant',
       version: 'MVP · v0.5',
       logout: 'Sign out',
     },
@@ -1114,6 +1135,25 @@ const dict = {
     },
     common: {
       readOnly: 'Read-only',
+    },
+    assistant: {
+      title: 'AI Assistant',
+      subtitle: 'Ask questions about your data. The assistant is read-only and cannot make changes.',
+      placeholder: 'Ask a question… (e.g. Which invoices are unpaid?)',
+      send: 'Send',
+      sending: 'Sending…',
+      clear: 'Clear',
+      errGeneric: 'Something went wrong. Please try again.',
+      errTimeout: 'The assistant did not respond in time. Please try again.',
+      errLong: 'Question is too long. Maximum 500 characters.',
+      errNotConfigured: 'The AI assistant is not configured yet.',
+      suggestions: [
+        'Which products are running low?',
+        'How many T-Shirts do we have and where are they?',
+        'Which invoices are unpaid?',
+        'Which orders are open?',
+        'What is the total value of our inventory?',
+      ],
     },
   },
 } as const
