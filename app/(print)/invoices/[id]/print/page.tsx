@@ -103,7 +103,12 @@ export default async function InvoicePrintPage({ params }: { params: { id: strin
   const invoice = rawInvoice as unknown as InvoiceRow
   const items = (rawItems ?? []) as unknown as ItemRow[]
 
-  const companyName = process.env.NEXT_PUBLIC_COMPANY_NAME || 'StockFlow MVP'
+  const companyName    = process.env.NEXT_PUBLIC_COMPANY_NAME    || 'StockFlow Demo'
+  const companyAddress = process.env.NEXT_PUBLIC_COMPANY_ADDRESS  || null
+  const companyEIK     = process.env.NEXT_PUBLIC_COMPANY_EIK      || null
+  const companyVAT     = process.env.NEXT_PUBLIC_COMPANY_VAT      || null
+  const companyEmail   = process.env.NEXT_PUBLIC_COMPANY_EMAIL    || null
+  const companyPhone   = process.env.NEXT_PUBLIC_COMPANY_PHONE    || null
   const customer = invoice.customers
   const linkedOrder = invoice.outgoing_orders
   const balanceDue = Math.max(
@@ -147,10 +152,18 @@ export default async function InvoicePrintPage({ params }: { params: { id: strin
           </div>
         )}
 
-        {/* Document header */}
-        <div className="mb-8 flex items-start justify-between">
+        {/* Document header: issuer (left) + invoice meta (right) */}
+        <div className="mb-6 grid grid-cols-2 gap-8 border-b border-gray-200 pb-6">
           <div>
-            <p className="text-xl font-bold text-gray-900">{companyName}</p>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+              От / Издател
+            </p>
+            <p className="font-semibold text-gray-900">{companyName}</p>
+            {companyAddress && <p className="text-sm text-gray-600">{companyAddress}</p>}
+            {companyEIK     && <p className="text-sm text-gray-600">ЕИК: {companyEIK}</p>}
+            {companyVAT     && <p className="text-sm text-gray-600">ДДС №: {companyVAT}</p>}
+            {companyEmail   && <p className="text-sm text-gray-600">{companyEmail}</p>}
+            {companyPhone   && <p className="text-sm text-gray-600">{companyPhone}</p>}
           </div>
           <div className="text-right">
             <p className="text-2xl font-bold text-gray-900">ФАКТУРА</p>
@@ -162,10 +175,10 @@ export default async function InvoicePrintPage({ params }: { params: { id: strin
           </div>
         </div>
 
-        {/* Customer section */}
+        {/* Recipient section */}
         <div className="mb-8 rounded-lg border border-gray-200 p-4">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
-            До / Клиент
+            До / Получател
           </p>
           <p className="font-semibold text-gray-900">{customer?.name ?? '—'}</p>
           {customer?.email && (
