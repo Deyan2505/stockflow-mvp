@@ -9,7 +9,7 @@ import { can } from '@/lib/permissions'
 export default async function MovementsPage() {
   const role = await getCurrentRole()
   const canWrite = can(role, 'create_movement')
-  const canExport = role !== 'viewer'
+  const canExport = can(role, 'export_reports')
   const sb = createAdminClient()
   const co = process.env.DEMO_COMPANY_ID!
 

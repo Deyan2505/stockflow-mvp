@@ -3,12 +3,13 @@ export const dynamic = 'force-dynamic'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { InventoryClient } from './inventory-client'
 import { getCurrentRole } from '@/lib/current-user'
+import { can } from '@/lib/permissions'
 
 const CO = process.env.DEMO_COMPANY_ID!
 
 export default async function InventoryPage() {
   const role = await getCurrentRole()
-  const canExport = role !== 'viewer'
+  const canExport = can(role, 'export_reports')
   const sb = createAdminClient()
 
   const [{ data: rows, error: errRows }, { data: warehouses, error: errWarehouses }] =
