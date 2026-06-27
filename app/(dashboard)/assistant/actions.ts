@@ -1,10 +1,10 @@
 'use server'
 
-import Anthropic from '@anthropic-ai/sdk'
+import OpenAI from 'openai'
 import { getCurrentRole } from '@/lib/current-user'
 import { TOOL_SCHEMAS, executeTool } from './tools'
 
-const MODEL = 'claude-haiku-4-5-20251001'
+const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4.1-mini'
 const MAX_TOKENS = 2048
 const MAX_ITERATIONS = 5
 const MAX_QUESTION_LENGTH = 500
@@ -23,13 +23,13 @@ export async function askAssistant(question: string): Promise<AssistantResult> {
     if (!trimmed) return { success: false, error: 'errGeneric' }
     if (trimmed.length > MAX_QUESTION_LENGTH) return { success: false, error: 'errLong' }
 
-    // 3. Check API key
-    if (!process.env.ANTHROPIC_API_KEY) {
+    // 3. Check API key — server-side only, never NEXT_PUBLIC_
+    if (!process.env.OPENAI_API_KEY) {
       return { success: false, error: 'errNotConfigured' }
     }
 
-    // 4. Create Anthropic client server-side only
-    const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+    // 4. Create OpenAI client server-side only
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
     // 5. System prompt
     const today = new Date().toISOString().split('T')[0]
@@ -53,54 +53,60 @@ IMPORTANT RULES:
 - Currency in this system is EUR (€).`
 
     // 6. Tool-use loop
-    const messages: Anthropic.Messages.MessageParam[] = [
+    const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+      { role: 'system', content: systemPrompt },
       { role: 'user', content: trimmed },
     ]
 
     for (let i = 0; i < MAX_ITERATIONS; i++) {
-      const response = await anthropic.messages.create({
-        model: MODEL,
+      const response = await openai.chat.completions.create({
+        model: OPENAI_MODEL,
         max_tokens: MAX_TOKENS,
-        system: systemPrompt,
         tools: TOOL_SCHEMAS,
+        tool_choice: 'auto',
         messages,
       })
 
-      if (response.stop_reason === 'end_turn') {
-        const textBlock = response.content.find((b) => b.type === 'text')
-        const answer = textBlock?.type === 'text' ? textBlock.text : ''
-        return { success: true, answer: answer || 'No answer generated.' }
+      const choice = response.choices[0]
+      if (!choice) break
+
+      if (choice.finish_reason === 'stop') {
+        return { success: true, answer: choice.message.content || 'No answer generated.' }
       }
 
-      if (response.stop_reason === 'tool_use') {
-        // Append assistant's response to the conversation
-        messages.push({ role: 'assistant', content: response.content })
+      if (choice.finish_reason === 'tool_calls' && choice.message.tool_calls?.length) {
+        // Append the assistant's tool-call message to the conversation
+        messages.push({
+          role: 'assistant',
+          content: choice.message.content,
+          tool_calls: choice.message.tool_calls,
+        })
 
-        // Execute all tool calls and collect results
-        const toolResults: Anthropic.Messages.ToolResultBlockParam[] = []
+        // Execute every requested tool and append results
+        for (const toolCall of choice.message.tool_calls) {
+          if (toolCall.type !== 'function') continue
 
-        for (const block of response.content) {
-          if (block.type === 'tool_use') {
-            const result = await executeTool(
-              block.name,
-              block.input as Record<string, unknown>,
-            )
-            toolResults.push({
-              type: 'tool_result',
-              tool_use_id: block.id,
-              content: JSON.stringify(result),
-            })
+          let args: Record<string, unknown> = {}
+          try {
+            args = JSON.parse(toolCall.function.arguments || '{}')
+          } catch {
+            args = {}
           }
-        }
 
-        messages.push({ role: 'user', content: toolResults })
+          const result = await executeTool(toolCall.function.name, args)
+
+          messages.push({
+            role: 'tool',
+            tool_call_id: toolCall.id,
+            content: JSON.stringify(result),
+          })
+        }
         continue
       }
 
-      // Unexpected stop reason — extract any text and return
-      const textBlock = response.content.find((b) => b.type === 'text')
-      if (textBlock?.type === 'text' && textBlock.text) {
-        return { success: true, answer: textBlock.text }
+      // Other finish reasons (length, content_filter) — return whatever text exists
+      if (choice.message.content) {
+        return { success: true, answer: choice.message.content }
       }
       break
     }
@@ -108,16 +114,20 @@ IMPORTANT RULES:
     return { success: false, error: 'errTimeout' }
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Unknown error'
-    // Log real error server-side for debugging — no secrets printed
-    console.error('[assistant] askAssistant error:', msg.replace(/sk-ant-[^\s"]+/g, '[REDACTED]'))
-    // Map known setup/billing issues to a clean user-facing error
+    // Log safely — redact any key-like strings
+    console.error('[assistant] error:', msg.replace(/sk-[a-zA-Z0-9\-_]+/g, '[REDACTED]'))
+    // Map known setup/billing/auth issues to a clean user-facing error
     if (
-      msg.includes('ANTHROPIC_API_KEY') ||
+      msg.includes('OPENAI_API_KEY') ||
+      msg.includes('Incorrect API key') ||
+      msg.includes('invalid_api_key') ||
       msg.includes('authentication') ||
-      msg.includes('credit balance') ||
-      msg.includes('too low') ||
-      msg.includes('upgrade') ||
-      msg.includes('invalid x-api-key')
+      msg.includes('quota') ||
+      msg.includes('billing') ||
+      msg.includes('credit') ||
+      msg.includes('rate limit') ||
+      msg.includes('does not exist') ||
+      msg.includes('model_not_found')
     ) {
       return { success: false, error: 'errNotConfigured' }
     }

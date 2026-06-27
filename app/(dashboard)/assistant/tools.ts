@@ -9,169 +9,199 @@ import { createAdminClient } from '@/lib/supabase/admin'
 const CO = process.env.DEMO_COMPANY_ID!
 const LIMIT = 50
 
-// ─── Anthropic tool schemas ───────────────────────────────────────────────────
+// ─── OpenAI tool schemas ──────────────────────────────────────────────────────
 
 export const TOOL_SCHEMAS = [
   {
-    name: 'get_products',
-    description:
-      'List active products with name, SKU, unit, category, sale price and minimum quantity. Use for questions about what products exist, their prices, units, or categories.',
-    input_schema: {
-      type: 'object' as const,
-      properties: {
-        search: {
-          type: 'string',
-          description: 'Optional: filter by product name or SKU (case-insensitive partial match)',
+    type: 'function' as const,
+    function: {
+      name: 'get_products',
+      description:
+        'List active products with name, SKU, unit, category, sale price and minimum quantity. Use for questions about what products exist, their prices, units, or categories.',
+      parameters: {
+        type: 'object',
+        properties: {
+          search: {
+            type: 'string',
+            description: 'Optional: filter by product name or SKU (case-insensitive partial match)',
+          },
         },
       },
     },
   },
   {
-    name: 'get_inventory',
-    description:
-      'Get available stock quantities by product and location. Use for "how many X do we have", "where is product Y", or warehouse-specific questions.',
-    input_schema: {
-      type: 'object' as const,
-      properties: {
-        product_name: {
-          type: 'string',
-          description: 'Optional: filter by product name (partial match)',
-        },
-        warehouse_name: {
-          type: 'string',
-          description: 'Optional: filter by warehouse name (partial match)',
-        },
-      },
-    },
-  },
-  {
-    name: 'get_low_stock',
-    description:
-      'List products whose available quantity is below their minimum quantity threshold. Use for "what needs restocking", "what is running low".',
-    input_schema: { type: 'object' as const, properties: {} },
-  },
-  {
-    name: 'get_movements',
-    description:
-      'Get recent stock movement history (IN/OUT/TRANSFER). Use for "what movements did product X have", "recent stock activity", or movement audit questions.',
-    input_schema: {
-      type: 'object' as const,
-      properties: {
-        product_name: {
-          type: 'string',
-          description: 'Optional: filter by product name (partial match)',
-        },
-        movement_type: {
-          type: 'string',
-          enum: ['IN', 'OUT', 'TRANSFER'],
-          description: 'Optional: filter by movement type',
-        },
-        limit: {
-          type: 'number',
-          description: 'Max rows to return (default 20, max 50)',
+    type: 'function' as const,
+    function: {
+      name: 'get_inventory',
+      description:
+        'Get available stock quantities by product and location. Use for "how many X do we have", "where is product Y", or warehouse-specific questions.',
+      parameters: {
+        type: 'object',
+        properties: {
+          product_name: {
+            type: 'string',
+            description: 'Optional: filter by product name (partial match)',
+          },
+          warehouse_name: {
+            type: 'string',
+            description: 'Optional: filter by warehouse name (partial match)',
+          },
         },
       },
     },
   },
   {
-    name: 'get_deliveries',
-    description:
-      'List incoming deliveries and their statuses. Use for "which deliveries are pending", "expected deliveries", or supplier delivery questions.',
-    input_schema: {
-      type: 'object' as const,
-      properties: {
-        status: {
-          type: 'string',
-          description: 'Optional: filter by status (expected, partially_received, received, cancelled)',
-        },
-        supplier_name: {
-          type: 'string',
-          description: 'Optional: filter by supplier name (partial match)',
+    type: 'function' as const,
+    function: {
+      name: 'get_low_stock',
+      description:
+        'List products whose available quantity is below their minimum quantity threshold. Use for "what needs restocking", "what is running low".',
+      parameters: { type: 'object', properties: {} },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'get_movements',
+      description:
+        'Get recent stock movement history (IN/OUT/TRANSFER). Use for "what movements did product X have", "recent stock activity", or movement audit questions.',
+      parameters: {
+        type: 'object',
+        properties: {
+          product_name: {
+            type: 'string',
+            description: 'Optional: filter by product name (partial match)',
+          },
+          movement_type: {
+            type: 'string',
+            enum: ['IN', 'OUT', 'TRANSFER'],
+            description: 'Optional: filter by movement type',
+          },
+          limit: {
+            type: 'number',
+            description: 'Max rows to return (default 20, max 50)',
+          },
         },
       },
     },
   },
   {
-    name: 'get_orders',
-    description:
-      'List outgoing orders and their statuses. Use for "which orders are open", "orders for customer X", or order fulfilment questions.',
-    input_schema: {
-      type: 'object' as const,
-      properties: {
-        status: {
-          type: 'string',
-          description: 'Optional: filter by status (draft, open, fulfilled, cancelled)',
-        },
-        customer_name: {
-          type: 'string',
-          description: 'Optional: filter by customer name (partial match)',
-        },
-      },
-    },
-  },
-  {
-    name: 'get_customers',
-    description:
-      'List customers with contact and billing details. Use for "who are our customers", "customer details for X", or invoice recipient questions.',
-    input_schema: {
-      type: 'object' as const,
-      properties: {
-        search: {
-          type: 'string',
-          description: 'Optional: filter by customer name, email, or EIK (partial match)',
-        },
-        status: {
-          type: 'string',
-          enum: ['active', 'inactive'],
-          description: 'Optional: filter by status',
+    type: 'function' as const,
+    function: {
+      name: 'get_deliveries',
+      description:
+        'List incoming deliveries and their statuses. Use for "which deliveries are pending", "expected deliveries", or supplier delivery questions.',
+      parameters: {
+        type: 'object',
+        properties: {
+          status: {
+            type: 'string',
+            description: 'Optional: filter by status (expected, partially_received, received, cancelled)',
+          },
+          supplier_name: {
+            type: 'string',
+            description: 'Optional: filter by supplier name (partial match)',
+          },
         },
       },
     },
   },
   {
-    name: 'get_invoices',
-    description:
-      'List invoices filtered by document status or payment status. Use for "unpaid invoices", "draft invoices", "issued invoices", or invoice payment questions.',
-    input_schema: {
-      type: 'object' as const,
-      properties: {
-        status: {
-          type: 'string',
-          enum: ['draft', 'issued', 'cancelled'],
-          description: 'Optional: filter by invoice document status',
-        },
-        payment_status: {
-          type: 'string',
-          enum: ['unpaid', 'partially_paid', 'paid'],
-          description: 'Optional: filter by payment status',
-        },
-        customer_name: {
-          type: 'string',
-          description: 'Optional: filter by customer name (partial match)',
+    type: 'function' as const,
+    function: {
+      name: 'get_orders',
+      description:
+        'List outgoing orders and their statuses. Use for "which orders are open", "orders for customer X", or order fulfilment questions.',
+      parameters: {
+        type: 'object',
+        properties: {
+          status: {
+            type: 'string',
+            description: 'Optional: filter by status (draft, open, fulfilled, cancelled)',
+          },
+          customer_name: {
+            type: 'string',
+            description: 'Optional: filter by customer name (partial match)',
+          },
         },
       },
     },
   },
   {
-    name: 'get_invoice_detail',
-    description:
-      'Get full detail of a single invoice: line items, totals, payments, and linked order. Use when asked about a specific invoice by number.',
-    input_schema: {
-      type: 'object' as const,
-      properties: {
-        invoice_number: {
-          type: 'string',
-          description: 'The invoice number to look up (exact match)',
+    type: 'function' as const,
+    function: {
+      name: 'get_customers',
+      description:
+        'List customers with contact and billing details. Use for "who are our customers", "customer details for X", or invoice recipient questions.',
+      parameters: {
+        type: 'object',
+        properties: {
+          search: {
+            type: 'string',
+            description: 'Optional: filter by customer name, email, or EIK (partial match)',
+          },
+          status: {
+            type: 'string',
+            enum: ['active', 'inactive'],
+            description: 'Optional: filter by status',
+          },
         },
       },
-      required: ['invoice_number'],
     },
   },
   {
-    name: 'get_stock_value',
-    description:
-      'Calculate the estimated total inventory value (quantity × cost price). Use for "total stock value", "how much is our inventory worth".',
-    input_schema: { type: 'object' as const, properties: {} },
+    type: 'function' as const,
+    function: {
+      name: 'get_invoices',
+      description:
+        'List invoices filtered by document status or payment status. Use for "unpaid invoices", "draft invoices", "issued invoices", or invoice payment questions.',
+      parameters: {
+        type: 'object',
+        properties: {
+          status: {
+            type: 'string',
+            enum: ['draft', 'issued', 'cancelled'],
+            description: 'Optional: filter by invoice document status',
+          },
+          payment_status: {
+            type: 'string',
+            enum: ['unpaid', 'partially_paid', 'paid'],
+            description: 'Optional: filter by payment status',
+          },
+          customer_name: {
+            type: 'string',
+            description: 'Optional: filter by customer name (partial match)',
+          },
+        },
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'get_invoice_detail',
+      description:
+        'Get full detail of a single invoice: line items, totals, payments, and linked order. Use when asked about a specific invoice by number.',
+      parameters: {
+        type: 'object',
+        properties: {
+          invoice_number: {
+            type: 'string',
+            description: 'The invoice number to look up (exact match)',
+          },
+        },
+        required: ['invoice_number'],
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'get_stock_value',
+      description:
+        'Calculate the estimated total inventory value (quantity × cost price). Use for "total stock value", "how much is our inventory worth".',
+      parameters: { type: 'object', properties: {} },
+    },
   },
 ]
 
