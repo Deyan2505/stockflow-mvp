@@ -108,8 +108,17 @@ IMPORTANT RULES:
     return { success: false, error: 'errTimeout' }
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Unknown error'
-    // Don't leak internal error details to the client
-    if (msg.includes('ANTHROPIC_API_KEY') || msg.includes('authentication')) {
+    // Log real error server-side for debugging — no secrets printed
+    console.error('[assistant] askAssistant error:', msg.replace(/sk-ant-[^\s"]+/g, '[REDACTED]'))
+    // Map known setup/billing issues to a clean user-facing error
+    if (
+      msg.includes('ANTHROPIC_API_KEY') ||
+      msg.includes('authentication') ||
+      msg.includes('credit balance') ||
+      msg.includes('too low') ||
+      msg.includes('upgrade') ||
+      msg.includes('invalid x-api-key')
+    ) {
       return { success: false, error: 'errNotConfigured' }
     }
     return { success: false, error: 'errGeneric' }

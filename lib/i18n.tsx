@@ -571,7 +571,7 @@ const dict = {
       errGeneric: 'Нещо се обърка. Опитайте отново.',
       errTimeout: 'Асистентът не успя да отговори навреме. Опитайте отново.',
       errLong: 'Въпросът е твърде дълъг. Максимум 500 символа.',
-      errNotConfigured: 'AI асистентът не е конфигуриран за момента.',
+      errNotConfigured: 'AI асистентът не е наличен в момента. Моля свържете се с администратора.',
       suggestions: [
         'Кои продукти са на изчерпване?',
         'Колко броя Фланелки имаме и къде се намират?',
@@ -1146,7 +1146,7 @@ const dict = {
       errGeneric: 'Something went wrong. Please try again.',
       errTimeout: 'The assistant did not respond in time. Please try again.',
       errLong: 'Question is too long. Maximum 500 characters.',
-      errNotConfigured: 'The AI assistant is not configured yet.',
+      errNotConfigured: 'The AI assistant is not available at the moment. Please contact the administrator.',
       suggestions: [
         'Which products are running low?',
         'How many T-Shirts do we have and where are they?',
