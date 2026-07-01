@@ -1,7 +1,9 @@
 export const dynamic = 'force-dynamic'
 
 import { createAdminClient } from '@/lib/supabase/admin'
-import { DashboardView, type Stats, type DayData, type RecentMovement, type ActiveDelivery } from './dashboard-view'
+import { getCurrentRole } from '@/lib/current-user'
+import { can } from '@/lib/permissions'
+import { DashboardView, type Stats, type DayData, type RecentMovement, type ActiveDelivery, type OnboardingData } from './dashboard-view'
 
 const CO = process.env.DEMO_COMPANY_ID!
 const BG_DAYS = ['Нд', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб']
@@ -12,6 +14,9 @@ export default async function DashboardPage() {
   const since7d = new Date()
   since7d.setDate(since7d.getDate() - 6)
   since7d.setHours(0, 0, 0, 0)
+
+  // Run role lookup in parallel with all DB queries
+  const rolePromise = getCurrentRole()
 
   const [
     { count: productCount },
@@ -24,6 +29,11 @@ export default async function DashboardPage() {
     { data: recentMoves },
     { data: activeDels },
     { data: delStatuses },
+    { count: customerCount },
+    { count: orderCount },
+    { count: fulfilledOrderCount },
+    { count: invoiceCount },
+    { count: paymentCount },
   ] = await Promise.all([
     sb.from('products').select('id', { count: 'exact', head: true })
       .eq('company_id', CO).eq('status', 'active'),
@@ -58,7 +68,19 @@ export default async function DashboardPage() {
       .select('status')
       .eq('company_id', CO)
       .in('status', ['expected', 'partially_received']),
+    sb.from('customers').select('id', { count: 'exact', head: true })
+      .eq('company_id', CO).eq('status', 'active'),
+    sb.from('outgoing_orders').select('id', { count: 'exact', head: true })
+      .eq('company_id', CO),
+    sb.from('outgoing_orders').select('id', { count: 'exact', head: true })
+      .eq('company_id', CO).eq('status', 'fulfilled'),
+    sb.from('invoices').select('id', { count: 'exact', head: true })
+      .eq('company_id', CO),
+    sb.from('invoice_payments').select('id', { count: 'exact', head: true })
+      .eq('company_id', CO),
   ])
+
+  const role = await rolePromise
 
   // ── Inventory calculations ─────────────────────────────────────────────────
   const stockByProduct = new Map<string, number>()
@@ -161,6 +183,19 @@ export default async function DashboardPage() {
     inventoryValueKnown,
   }
 
+  const onboarding: OnboardingData = {
+    warehouseCount: warehouseCount ?? 0,
+    locationCount: locationCount ?? 0,
+    productCount: productCount ?? 0,
+    inventoryPositions,
+    customerCount: customerCount ?? 0,
+    orderCount: orderCount ?? 0,
+    fulfilledOrderCount: fulfilledOrderCount ?? 0,
+    invoiceCount: invoiceCount ?? 0,
+    paymentCount: paymentCount ?? 0,
+    canCreate: can(role, 'manage_warehouses'),
+  }
+
   return (
     <DashboardView
       stats={stats}
@@ -168,6 +203,7 @@ export default async function DashboardPage() {
       lowStock={allLowStock.slice(0, 6)}
       recentMovements={recentMovements}
       activeDeliveries={activeDeliveries}
+      onboarding={onboarding}
     />
   )
 }

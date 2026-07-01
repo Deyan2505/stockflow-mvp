@@ -3,7 +3,9 @@
 import Link from 'next/link'
 import {
   Package, Warehouse, MapPin, Layers, AlertTriangle,
-  Truck, ClipboardList, BarChart3, ArrowRightLeft, type LucideIcon,
+  Truck, ClipboardList, BarChart3, ArrowRightLeft,
+  Users, ShoppingCart, PackageOpen, FileText, CreditCard, Printer,
+  CheckCircle2, ArrowRight, Info, type LucideIcon,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useT, type T } from '@/lib/i18n'
@@ -35,6 +37,13 @@ export type ActiveDelivery = {
   id: string; delivery_number: string; supplier_name: string
   status: string; expected_date: string | null
   total_expected: number; total_received: number; remaining: number
+}
+
+export type OnboardingData = {
+  warehouseCount: number; locationCount: number; productCount: number
+  inventoryPositions: number; customerCount: number; orderCount: number
+  fulfilledOrderCount: number; invoiceCount: number; paymentCount: number
+  canCreate: boolean
 }
 
 // ── StatCard (row 1) ───────────────────────────────────────────────────────────
@@ -405,15 +414,196 @@ function LowStockPanel({ items, d }: { items: LowItem[]; d: T['dashboard'] }) {
   )
 }
 
+// ── Getting Started ────────────────────────────────────────────────────────────
+
+type StepStatus = 'done' | 'next' | 'pending'
+
+function OnboardingStepCard({
+  number, icon: Icon, title, desc, href, status, canCreate, actionGo, actionView,
+  statusDone, statusNext, statusPending,
+}: {
+  number: number; icon: LucideIcon; title: string; desc: string; href: string
+  status: StepStatus; canCreate: boolean
+  actionGo: string; actionView: string; statusDone: string; statusNext: string; statusPending: string
+}) {
+  const isDone    = status === 'done'
+  const isNext    = status === 'next'
+  const isPending = status === 'pending'
+  return (
+    <div className={cn(
+      'flex flex-col rounded-xl border p-3 transition-all',
+      isDone    ? 'border-emerald-200 bg-emerald-50/50 dark:border-emerald-900/40 dark:bg-emerald-950/10' :
+      isNext    ? 'border-indigo-300 bg-indigo-50/60 ring-1 ring-indigo-200 dark:border-indigo-700 dark:bg-indigo-950/20 dark:ring-indigo-800' :
+      'border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-900',
+    )}>
+      {/* Header: step number + status badge */}
+      <div className="mb-2 flex items-start justify-between gap-1">
+        <div className={cn(
+          'flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[11px] font-bold',
+          isDone    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400' :
+          isNext    ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-400' :
+          'bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500',
+        )}>
+          {number}
+        </div>
+        <span className={cn(
+          'rounded-full px-2 py-0.5 text-[10px] font-medium whitespace-nowrap',
+          isDone    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' :
+          isNext    ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400' :
+          'bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500',
+        )}>
+          {isDone ? statusDone : isNext ? statusNext : statusPending}
+        </span>
+      </div>
+      {/* Icon + title */}
+      <div className="mb-1 flex items-center gap-1.5">
+        <Icon className={cn(
+          'h-4 w-4 shrink-0',
+          isDone    ? 'text-emerald-600 dark:text-emerald-400' :
+          isNext    ? 'text-indigo-600 dark:text-indigo-400' :
+          'text-gray-300 dark:text-gray-600',
+        )} strokeWidth={1.8} />
+        <p className={cn(
+          'text-xs font-semibold leading-tight',
+          isDone    ? 'text-emerald-900 dark:text-emerald-200' :
+          isNext    ? 'text-indigo-900 dark:text-indigo-100' :
+          isPending ? 'text-gray-500 dark:text-gray-500' : '',
+        )}>{title}</p>
+      </div>
+      {/* Description */}
+      <p className={cn(
+        'flex-1 text-[11px] leading-relaxed',
+        isDone    ? 'text-emerald-700/70 dark:text-emerald-500/60' :
+        isNext    ? 'text-indigo-700/80 dark:text-indigo-400/70' :
+        'text-gray-400 dark:text-gray-600',
+      )}>{desc}</p>
+      {/* Button */}
+      <div className="mt-3">
+        <Link href={href} className={cn(
+          'flex items-center justify-center gap-1 rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition-colors',
+          isDone    ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/50' :
+          isNext    ? 'bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-700 dark:hover:bg-indigo-600' :
+          'bg-gray-100 text-gray-400 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-500 dark:hover:bg-gray-700',
+        )}>
+          {canCreate ? actionGo : actionView}
+          <ArrowRight className="h-3 w-3" />
+        </Link>
+      </div>
+    </div>
+  )
+}
+
+function GettingStartedSection({ data, gs }: {
+  data: OnboardingData
+  gs: T['gettingStarted']
+}) {
+  const isDoneArr: boolean[] = [
+    data.warehouseCount > 0,
+    data.locationCount > 0,
+    data.productCount > 0,
+    data.inventoryPositions > 0,
+    data.customerCount > 0,
+    data.orderCount > 0,
+    data.fulfilledOrderCount > 0,
+    data.invoiceCount > 0,
+    data.paymentCount > 0,
+    data.invoiceCount > 0,
+  ]
+
+  const nextIdx   = isDoneArr.findIndex(d => !d)
+  const allDone   = nextIdx === -1
+
+  const HREFS: string[] = [
+    '/warehouses', '/locations', '/products', '/deliveries',
+    '/customers', '/orders', '/orders', '/invoices', '/invoices', '/invoices',
+  ]
+
+  const ICONS: LucideIcon[] = [
+    Warehouse, MapPin, Package, Truck,
+    Users, ShoppingCart, PackageOpen, FileText, CreditCard, Printer,
+  ]
+
+  const steps = gs.steps as readonly { title: string; desc: string }[]
+
+  return (
+    <div className="rounded-2xl border border-gray-100 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
+      {/* Title */}
+      <div className="mb-4">
+        <h2 className="text-base font-semibold text-gray-900 dark:text-white">{gs.title}</h2>
+        <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{gs.subtitle}</p>
+      </div>
+
+      {/* Recommended next step / all-done banner */}
+      {allDone ? (
+        <div className="mb-4 flex items-center gap-3 rounded-xl bg-emerald-50 px-4 py-3 dark:bg-emerald-950/20">
+          <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+          <div>
+            <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">{gs.allDoneTitle}</p>
+            <p className="text-xs text-emerald-700/70 dark:text-emerald-500/60">{gs.allDoneMsg}</p>
+          </div>
+        </div>
+      ) : (
+        <div className="mb-4 flex items-center justify-between gap-3 rounded-xl bg-indigo-50 px-4 py-3 dark:bg-indigo-950/20">
+          <div className="flex min-w-0 items-center gap-2">
+            <ArrowRight className="h-4 w-4 shrink-0 text-indigo-500 dark:text-indigo-400" />
+            <p className="truncate text-sm text-indigo-800 dark:text-indigo-300">
+              <span className="font-medium">{gs.recommendedLabel}</span>{' '}
+              {steps[nextIdx]?.title ?? ''}
+            </p>
+          </div>
+          <Link href={HREFS[nextIdx] ?? '/'}
+            className="shrink-0 rounded-lg bg-indigo-600 px-3 py-1 text-xs font-medium text-white hover:bg-indigo-700 dark:bg-indigo-700 dark:hover:bg-indigo-600">
+            →
+          </Link>
+        </div>
+      )}
+
+      {/* Step grid: 1 col → 2 col → 5 col */}
+      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-5">
+        {steps.map((step, i) => {
+          const status: StepStatus = isDoneArr[i] ? 'done' : i === nextIdx ? 'next' : 'pending'
+          return (
+            <OnboardingStepCard
+              key={i}
+              number={i + 1}
+              icon={ICONS[i]}
+              title={step.title}
+              desc={step.desc}
+              href={HREFS[i]}
+              status={status}
+              canCreate={data.canCreate}
+              actionGo={gs.actionGo}
+              actionView={gs.actionView}
+              statusDone={gs.statusDone}
+              statusNext={gs.statusNext}
+              statusPending={gs.statusPending}
+            />
+          )
+        })}
+      </div>
+
+      {/* Workflow explanation callout */}
+      <div className="mt-4 flex gap-3 rounded-xl border border-blue-100 bg-blue-50/50 px-4 py-3 dark:border-blue-900/30 dark:bg-blue-950/10">
+        <Info className="mt-0.5 h-4 w-4 shrink-0 text-blue-500 dark:text-blue-400" />
+        <div>
+          <p className="text-xs font-semibold text-blue-900 dark:text-blue-300">{gs.workflowNoteTitle}</p>
+          <p className="mt-0.5 text-xs text-blue-700/70 dark:text-blue-400/60">{gs.workflowNoteBody}</p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Main View ──────────────────────────────────────────────────────────────────
 
-export function DashboardView({ stats, chartData, lowStock, recentMovements, activeDeliveries }: {
+export function DashboardView({ stats, chartData, lowStock, recentMovements, activeDeliveries, onboarding }: {
   stats: Stats; chartData: DayData[]; lowStock: LowItem[]
   recentMovements: RecentMovement[]; activeDeliveries: ActiveDelivery[]
+  onboarding: OnboardingData
 }) {
   const { t, lang } = useT()
   const d = t.dashboard
-  const noData = stats.products === 0 && stats.warehouses === 0
+  const gs = t.gettingStarted
 
   const valueDisplay = stats.inventoryValueKnown
     ? stats.inventoryValue.toLocaleString('bg-BG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -425,6 +615,9 @@ export function DashboardView({ stats, chartData, lowStock, recentMovements, act
         <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">{d.title}</h1>
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{d.subtitle}</p>
       </div>
+
+      {/* Getting Started */}
+      <GettingStartedSection data={onboarding} gs={gs} />
 
       {/* Row 1 — main KPI cards */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -494,17 +687,6 @@ export function DashboardView({ stats, chartData, lowStock, recentMovements, act
       {/* Row 5 — Low Stock */}
       {lowStock.length > 0 && (
         <LowStockPanel items={lowStock} d={d} />
-      )}
-
-      {/* Onboarding */}
-      {noData && (
-        <div className="rounded-2xl border border-dashed border-gray-200 bg-white p-16 text-center dark:border-gray-700 dark:bg-gray-900">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 dark:bg-indigo-950/40">
-            <Package className="h-6 w-6 text-indigo-500" strokeWidth={1.5} />
-          </div>
-          <p className="text-sm font-medium text-gray-500 dark:text-gray-400">{d.onboarding}</p>
-          <p className="mt-1 text-xs text-gray-300 dark:text-gray-600">{d.onboardingSub}</p>
-        </div>
       )}
     </div>
   )
