@@ -7,9 +7,9 @@ import { useT } from '@/lib/i18n'
 
 type Props = { product: Product | null; onClose: () => void }
 
-const UNITS = ['бр.', 'кг.', 'г.', 'л.', 'мл.', 'м.', 'см.', 'кутия', 'кашон', 'пакет', 'бутилка']
+const UNITS = ['pcs']
 
-const empty: ProductInput = { name: '', sku: null, barcode: null, category: null, unit: 'бр.', min_quantity: 0, cost_price: null, sale_price: null }
+const empty: ProductInput = { name: '', sku: null, barcode: null, category: null, unit: 'pcs', min_quantity: 0, cost_price: null, sale_price: null }
 
 function toInput(prod: Product): ProductInput {
   return { name: prod.name, sku: prod.sku, barcode: prod.barcode, category: prod.category, unit: prod.unit, min_quantity: prod.min_quantity, cost_price: prod.cost_price, sale_price: prod.sale_price }
@@ -80,6 +80,7 @@ export function ProductModal({ product, onClose }: Props) {
                 onChange={(e) => set('unit', e.target.value as never)}
                 className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
               >
+                {product && product.unit !== 'pcs' && <option value={product.unit} disabled>{product.unit} (legacy)</option>}
                 {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
               </select>
             </div>

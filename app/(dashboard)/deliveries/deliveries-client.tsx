@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition, useMemo } from 'react'
+import Link from 'next/link'
 import { Search } from 'lucide-react'
 import { type Delivery, type DeliveryResult, cancelDelivery } from './actions'
 import { DeliveryModal } from './delivery-modal'
@@ -15,11 +16,12 @@ type Props = {
   products: { id: string; name: string; unit: string }[]
   locations: { id: string; code: string }[]
   deliveryMovements: DeliveryMovement[]
+  occupancy: { location_id: string; product_id: string }[]
   canReceive: boolean
   canManage: boolean
 }
 
-export function DeliveriesClient({ deliveries, suppliers, products, locations, deliveryMovements, canReceive, canManage }: Props) {
+export function DeliveriesClient({ deliveries, suppliers, products, locations, deliveryMovements, occupancy, canReceive, canManage }: Props) {
   const { t } = useT()
   const d = t.deliveries
 
@@ -112,6 +114,9 @@ export function DeliveriesClient({ deliveries, suppliers, products, locations, d
         <div>
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">{d.title}</h1>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{d.subtitle}</p>
+          {canReceive && <Link href="/overflow-requests" className="mt-2 inline-block text-sm font-medium text-blue-600 hover:underline">
+            Няма място за доставка? Заяви извънредно приемане
+          </Link>}
         </div>
         {canManage && (
           <button
@@ -270,6 +275,7 @@ export function DeliveriesClient({ deliveries, suppliers, products, locations, d
           delivery={receiveModal}
           products={products}
           locations={locations}
+          occupancy={occupancy}
           onClose={handleReceiveClose}
         />
       )}

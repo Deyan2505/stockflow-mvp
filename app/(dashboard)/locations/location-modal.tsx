@@ -20,6 +20,7 @@ function emptyForm(warehouses: Warehouse[]): LocationInput {
     row: null,
     shelf: null,
     bin: null,
+    max_capacity_units: 0,
   }
 }
 
@@ -31,6 +32,7 @@ function toInput(l: Location): LocationInput {
     row: l.row,
     shelf: l.shelf,
     bin: l.bin,
+    max_capacity_units: l.max_capacity_units,
   }
 }
 
@@ -51,6 +53,10 @@ export function LocationModal({ location, warehouses, onClose }: Props) {
     e.preventDefault()
     if (!form.code.trim()) { setError(l.errCode); return }
     if (!form.warehouse_id) { setError(l.errWarehouse); return }
+    if (!Number.isSafeInteger(form.max_capacity_units) || form.max_capacity_units <= 0 || form.max_capacity_units > 2147483647) {
+      setError(l.errCapacity)
+      return
+    }
     setError(null)
 
     startTransition(async () => {
@@ -128,6 +134,22 @@ export function LocationModal({ location, warehouses, onClose }: Props) {
                 className={inputClass}
               />
               <p className="mt-1 text-xs text-gray-400 dark:text-gray-600">{l.codeHint}</p>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
+                {l.fCapacity} <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="number"
+                min="1"
+                max="2147483647"
+                step="1"
+                required
+                value={form.max_capacity_units || ''}
+                onChange={(e) => set('max_capacity_units', Number(e.target.value))}
+                className={inputClass}
+              />
             </div>
 
             <div className="grid grid-cols-2 gap-3">

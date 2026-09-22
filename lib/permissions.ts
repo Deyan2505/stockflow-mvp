@@ -25,6 +25,7 @@ export type Permission =
   | 'issue_stock'
   | 'issue_invoice'
   | 'export_reports'
+  | 'request_overflow'
   // Admin
   | 'manage_users'
   | 'manage_company_settings';
@@ -57,6 +58,7 @@ export const OPERATIONAL_PERMISSIONS: Permission[] = [
   'issue_stock',
   'issue_invoice',
   'export_reports',
+  'request_overflow',
 ];
 
 export const ADMIN_PERMISSIONS: Permission[] = [

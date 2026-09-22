@@ -3,15 +3,14 @@ export const dynamic = 'force-dynamic'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { MovementsClient } from './movements-client'
 import type { ProductOption, LocationOption, BalanceRow, Movement, SupplierOption, CustomerOption } from './actions'
-import { getCurrentRole } from '@/lib/current-user'
+import { getCurrentUserContext } from '@/lib/current-user'
 import { can } from '@/lib/permissions'
 
 export default async function MovementsPage() {
-  const role = await getCurrentRole()
+  const { companyId: co, role } = await getCurrentUserContext()
   const canWrite = can(role, 'create_movement')
   const canExport = can(role, 'export_reports')
   const sb = createAdminClient()
-  const co = process.env.DEMO_COMPANY_ID!
 
   const [
     { data: products, error: errProducts },
@@ -23,7 +22,7 @@ export default async function MovementsPage() {
     { data: dbCustomers, error: errCustomers },
   ] = await Promise.all([
     sb.from('products').select('id, name, sku, unit, status').eq('company_id', co),
-    sb.from('locations').select('id, code, warehouse_id, status').eq('company_id', co).order('code'),
+    sb.from('locations').select('id, code, warehouse_id, status, is_buffer').eq('company_id', co).order('code'),
     sb.from('warehouses').select('id, name').eq('company_id', co),
     sb.from('stock_movements').select('*').eq('company_id', co).order('created_at', { ascending: false }).limit(100),
     sb.from('inventory_balances').select('product_id, location_id, quantity_available').eq('company_id', co),
@@ -32,7 +31,7 @@ export default async function MovementsPage() {
   ])
 
   const warehouseMap = new Map((warehouses ?? []).map((w: { id: string; name: string }) => [w.id, w.name]))
-  const locations = (rawLocations ?? []).map((l: { id: string; code: string; warehouse_id: string; status: string }) => ({
+  const locations = (rawLocations ?? []).map((l: { id: string; code: string; warehouse_id: string; status: string; is_buffer: boolean }) => ({
     ...l,
     warehouses: { name: warehouseMap.get(l.warehouse_id) ?? '?' },
   }))

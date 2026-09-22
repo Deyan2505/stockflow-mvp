@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { findProductByBarcode } from '@/lib/barcode-utils'
 import { recordMovement } from '@/lib/movement-engine'
-import { requirePermission } from '@/lib/current-user'
+import { requireAuthenticatedPermission, requirePermission } from '@/lib/current-user'
 
 const CO = process.env.DEMO_COMPANY_ID!
 
@@ -149,7 +149,8 @@ export async function cancelOrder(id: string): Promise<OrderResult> {
 export async function findProductForOrder(barcode: string): Promise<{ id: string; name: string } | null> {
   const trimmed = barcode.trim()
   if (!trimmed) return null
-  const product = await findProductByBarcode(trimmed)
+  const context = await requireAuthenticatedPermission('manage_orders')
+  const product = await findProductByBarcode(trimmed, context.companyId)
   if (!product) return null
   return { id: product.id, name: product.name }
 }
@@ -252,7 +253,8 @@ export type IssueResult =
 
 export async function issueOrder(input: IssueOrderInput): Promise<IssueResult> {
   try {
-    await requirePermission('issue_stock')
+    const context = await requireAuthenticatedPermission('issue_stock')
+    const co = context.companyId
     const sb = createAdminClient()
 
     // 1. Re-read order — guard against double-issue / cancelled / draft
@@ -260,7 +262,7 @@ export async function issueOrder(input: IssueOrderInput): Promise<IssueResult> {
       .from('outgoing_orders')
       .select('id, status, order_number, customer_name')
       .eq('id', input.order_id)
-      .eq('company_id', CO)
+      .eq('company_id', co)
       .single()
 
     if (!order) throw new Error('Поръчката не е намерена')
@@ -276,7 +278,7 @@ export async function issueOrder(input: IssueOrderInput): Promise<IssueResult> {
       .from('outgoing_order_items')
       .select('id, product_id, ordered_quantity, issued_quantity')
       .eq('order_id', input.order_id)
-      .eq('company_id', CO)
+      .eq('company_id', co)
 
     const dbItemsArr = dbItems ?? []
     const locationMap = new Map(input.items.map((i) => [i.item_id, i.from_location_id]))
@@ -293,6 +295,8 @@ export async function issueOrder(input: IssueOrderInput): Promise<IssueResult> {
     for (const dbItem of dbItemsArr) {
       const remaining = Number(dbItem.ordered_quantity) - Number(dbItem.issued_quantity)
       if (remaining <= 0) continue
+      if (!Number.isSafeInteger(remaining))
+        throw new Error('Количеството за изписване трябва да е цяло число в pcs.')
 
       const from_location_id = locationMap.get(dbItem.id) ?? ''
       if (!from_location_id)
@@ -309,7 +313,7 @@ export async function issueOrder(input: IssueOrderInput): Promise<IssueResult> {
       const { data: bal } = await sb
         .from('inventory_balances')
         .select('quantity_available, products(unit)')
-        .eq('company_id', CO)
+        .eq('company_id', co)
         .eq('product_id', item.product_id)
         .eq('location_id', item.from_location_id)
         .maybeSingle()
@@ -334,14 +338,14 @@ export async function issueOrder(input: IssueOrderInput): Promise<IssueResult> {
           : `Изписване по поръчка #${order.order_number}`,
         reference_type:   'outgoing_order',
         reference_id:     order.id,
-      })
+      }, context)
 
       const dbItem = dbItemsArr.find((i) => i.id === item.item_id)!
       await sb
         .from('outgoing_order_items')
         .update({ issued_quantity: Number(dbItem.issued_quantity) + item.qty })
         .eq('id', item.item_id)
-        .eq('company_id', CO)
+        .eq('company_id', co)
     }
 
     // 6. Mark order fulfilled + set issued_date
@@ -352,7 +356,7 @@ export async function issueOrder(input: IssueOrderInput): Promise<IssueResult> {
         issued_date: new Date().toISOString().substring(0, 10),
       })
       .eq('id', input.order_id)
-      .eq('company_id', CO)
+      .eq('company_id', co)
 
     revalidatePath('/orders')
     revalidatePath('/movements')

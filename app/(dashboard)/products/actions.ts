@@ -35,6 +35,7 @@ export type ProductInput = {
 
 export async function createProduct(input: ProductInput) {
   await requirePermission('manage_products')
+  if (input.unit !== 'pcs') throw new Error('Мерната единица трябва да бъде pcs.')
   const sb = createAdminClient()
   const { error } = await sb
     .from('products')
@@ -53,6 +54,7 @@ export async function createProduct(input: ProductInput) {
 
 export async function updateProduct(id: string, input: ProductInput) {
   await requirePermission('manage_products')
+  if (input.unit !== 'pcs') throw new Error('Мерната единица трябва да бъде pcs.')
   const sb = createAdminClient()
   const { error } = await sb
     .from('products')

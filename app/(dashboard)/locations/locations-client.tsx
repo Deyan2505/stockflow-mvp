@@ -126,19 +126,23 @@ export function LocationsClient({ locations, warehouses, canWrite }: Props) {
             ) : (
               filtered.map((loc) => (
                 <tr key={loc.id} className={cn('transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/50', loc.status === 'inactive' && 'opacity-50')}>
-                  <td className="px-4 py-3 font-mono text-sm font-medium text-gray-900 dark:text-white">{loc.code}</td>
+                  <td className="px-4 py-3 font-mono text-sm font-medium text-gray-900 dark:text-white">
+                    {loc.code}{loc.is_buffer && <span className="ml-2 rounded bg-amber-100 px-2 py-0.5 font-sans text-xs text-amber-800">Буферна локация</span>}
+                  </td>
                   <td className="px-4 py-3 text-gray-500 dark:text-gray-400">{loc.warehouses?.name ?? '—'}</td>
                   <td className="px-4 py-3 text-gray-500 dark:text-gray-400">{loc.zone ?? '—'}</td>
                   <td className="px-4 py-3 text-gray-500 dark:text-gray-400">{loc.row ?? '—'}</td>
                   <td className="px-4 py-3 text-gray-500 dark:text-gray-400">{loc.shelf ?? '—'}</td>
                   <td className="px-4 py-3 text-gray-500 dark:text-gray-400">{loc.bin ?? '—'}</td>
+                  <td className="px-4 py-3 text-gray-500 dark:text-gray-400">{loc.max_capacity_units} pcs</td>
+                  <td className="px-4 py-3 text-gray-500 dark:text-gray-400">{loc.occupied_units ?? 0} pcs</td>
                   <td className="px-4 py-3">
                     <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-medium', loc.status === 'active' ? 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400')}>
                       {loc.status === 'active' ? l.active : l.inactive}
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    {canWrite && (
+                    {canWrite && !loc.is_buffer && (
                       <div className="flex items-center gap-3">
                         <button onClick={() => setModal(loc)} className="text-xs text-blue-600 hover:underline dark:text-blue-400">{l.edit}</button>
                         {loc.status === 'active' ? (

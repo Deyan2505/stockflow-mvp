@@ -17,17 +17,22 @@ export default function LoginPage() {
     setError(null)
     setIsPending(true)
 
-    const supabase = createClient()
-    const { error: authError } = await supabase.auth.signInWithPassword({ email, password })
+    try {
+      const supabase = createClient()
+      const { error: authError } = await supabase.auth.signInWithPassword({ email, password })
 
-    if (authError) {
-      setError('Грешен имейл или парола. Моля, опитайте отново.')
+      if (authError) {
+        setError('Неуспешен вход. Проверете имейла и паролата и опитайте отново.')
+        return
+      }
+
+      router.push('/')
+      router.refresh()
+    } catch {
+      setError('Връзката със сървъра не успя. Проверете интернет връзката и опитайте отново.')
+    } finally {
       setIsPending(false)
-      return
     }
-
-    router.push('/')
-    router.refresh()
   }
 
   return (

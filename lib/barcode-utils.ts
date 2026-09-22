@@ -10,7 +10,10 @@ const CO = process.env.DEMO_COMPANY_ID!
  * Read-only — used by products form for duplicate-check guard.
  * Returns null if barcode is empty, not found, or archived.
  */
-export async function findProductByBarcode(barcode: string): Promise<Product | null> {
+export async function findProductByBarcode(
+  barcode: string,
+  companyId: string
+): Promise<Product | null> {
   const trimmed = barcode.trim()
   if (!trimmed) return null
 
@@ -18,7 +21,7 @@ export async function findProductByBarcode(barcode: string): Promise<Product | n
   const { data, error } = await sb
     .from('products')
     .select('*')
-    .eq('company_id', CO)
+    .eq('company_id', companyId)
     .eq('barcode', trimmed)
     .eq('status', 'active')
     .maybeSingle()

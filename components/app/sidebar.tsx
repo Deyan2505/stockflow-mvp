@@ -27,6 +27,7 @@ export function Sidebar() {
     { name: t.nav.customers,  href: '/customers',  icon: Users           },
     { name: t.nav.invoices,   href: '/invoices',   icon: FileText        },
     { name: t.nav.deliveries, href: '/deliveries', icon: ClipboardList   },
+    { name: t.nav.overflow,   href: '/overflow-requests', icon: ClipboardList },
     { name: t.nav.orders,     href: '/orders',     icon: ShoppingCart    },
     { name: t.nav.reports,    href: '/reports',    icon: TrendingDown    },
     { name: t.nav.assistant,  href: '/assistant',  icon: Sparkles        },

@@ -2,6 +2,7 @@
 
 import { useState, useTransition, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { Download, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { submitMovement, findProductForMovement } from './actions'
@@ -40,7 +41,7 @@ type Filters = {
   warehouseId: string
   dateFrom: string
   dateTo: string
-  referenceType: '' | 'manual' | 'incoming_delivery' | 'outgoing_order'
+  referenceType: '' | 'manual' | 'incoming_delivery' | 'outgoing_order' | 'overflow_request'
 }
 
 function emptyForm(): FormState {
@@ -64,6 +65,13 @@ function formatDate(iso: string): string {
   return new Date(iso).toLocaleString('en-GB', {
     day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false,
   })
+}
+
+function displayMovementNote(note: string | null): string {
+  if (!note) return '—'
+  return /^Approved overflow(?:\s+.*)?$/i.test(note.trim())
+    ? 'Одобрено извънредно приемане'
+    : note
 }
 
 function hasActiveFilters(f: Filters): boolean {
@@ -144,6 +152,7 @@ export function MovementsClient({ products, locations, movements, balances, supp
         if (filters.referenceType === 'manual' && mv.reference_type != null && mv.reference_type !== 'supplier' && mv.reference_type !== 'customer') return false
         if (filters.referenceType === 'incoming_delivery' && mv.reference_type !== 'incoming_delivery') return false
         if (filters.referenceType === 'outgoing_order' && mv.reference_type !== 'outgoing_order') return false
+        if (filters.referenceType === 'overflow_request' && mv.reference_type !== 'overflow_request') return false
       }
       return true
     })
@@ -186,7 +195,7 @@ export function MovementsClient({ products, locations, movements, balances, supp
     e.preventDefault()
     const qty = Number(form.quantity)
     if (!form.product_id) { setError(m.errProduct); return }
-    if (isNaN(qty) || qty <= 0) { setError(m.errQty); return }
+    if (!Number.isSafeInteger(qty) || qty <= 0) { setError('Количеството трябва да е положително цяло число в pcs.'); return }
     if ((tab === 'OUT' || tab === 'TRANSFER') && !form.from_location_id) { setError(m.errFromLoc); return }
     if ((tab === 'IN' || tab === 'TRANSFER') && !form.to_location_id) { setError(m.errToLoc); return }
     if (tab === 'TRANSFER' && form.from_location_id === form.to_location_id) { setError(m.errSameLoc); return }
@@ -228,7 +237,7 @@ export function MovementsClient({ products, locations, movements, balances, supp
     })
   }
 
-  const locationLabel = (loc: LocationOption) => `${loc.warehouses?.name ?? '?'} / ${loc.code}`
+  const locationLabel = (loc: LocationOption) => `${loc.warehouses?.name ?? '?'} / ${loc.code}${loc.is_buffer ? ' — Буферна локация' : ''}`
   const tabConfig = tabs.find((tb) => tb.id === tab)!
 
   const selectClass =
@@ -241,6 +250,7 @@ export function MovementsClient({ products, locations, movements, balances, supp
     if (!mv.reference_type) return '—'
     if (mv.reference_type === 'incoming_delivery') return m.refDelivery
     if (mv.reference_type === 'outgoing_order') return m.refOutgoingOrder
+    if (mv.reference_type === 'overflow_request') return 'Извънредно приемане'
     if (mv.reference_type === 'supplier') return '—'
     if (mv.reference_type === 'customer') return '—'
     return mv.reference_type
@@ -285,6 +295,8 @@ export function MovementsClient({ products, locations, movements, balances, supp
         ? 'Вх. доставка'
         : mv.reference_type === 'outgoing_order'
         ? 'Изх. поръчка'
+        : mv.reference_type === 'overflow_request'
+        ? 'Извънредно приемане'
         : mv.reference_type
       return [
         csvDateTime(mv.created_at),
@@ -294,7 +306,7 @@ export function MovementsClient({ products, locations, movements, balances, supp
         getToDisplay(mv),
         Number(mv.quantity),
         product?.unit ?? '',
-        mv.note ?? '',
+        mv.note ? displayMovementNote(mv.note) : '',
         refVal,
       ]
     })
@@ -504,7 +516,7 @@ export function MovementsClient({ products, locations, movements, balances, supp
                   <select value={form.to_location_id} onChange={(e) => set('to_location_id', e.target.value)} className={selectClass}>
                     <option value="">{m.selectLocation}</option>
                     {activeLocations
-                      .filter((loc) => loc.id !== form.from_location_id)
+                      .filter((loc) => !loc.is_buffer && loc.id !== form.from_location_id)
                       .map((loc) => (
                         <option key={loc.id} value={loc.id}>{locationLabel(loc)}</option>
                       ))}
@@ -519,7 +531,7 @@ export function MovementsClient({ products, locations, movements, balances, supp
                 </label>
                 <div className="flex items-center gap-2">
                   <input
-                    type="number" min="0.001" step="any"
+                    type="number" min="1" step="1"
                     value={form.quantity} onChange={(e) => set('quantity', e.target.value)}
                     placeholder="0" className={selectClass}
                   />
@@ -544,6 +556,9 @@ export function MovementsClient({ products, locations, movements, balances, supp
             </div>
 
             {error && <p className="mt-3 text-xs text-red-500">{error}</p>}
+            {tab === 'IN' && canWrite && <Link href="/overflow-requests" className="mt-3 inline-block text-sm font-medium text-blue-600 hover:underline">
+              Няма място? Създай заявка за извънредно приемане
+            </Link>}
             {success && <p className="mt-3 text-xs text-green-600 dark:text-green-400">{success}</p>}
 
             <button
@@ -685,6 +700,7 @@ export function MovementsClient({ products, locations, movements, balances, supp
                   <option value="manual">{m.filterManual}</option>
                   <option value="incoming_delivery">{m.filterDelivery}</option>
                   <option value="outgoing_order">{m.filterOutgoingOrder}</option>
+                  <option value="overflow_request">Извънредно приемане</option>
                 </select>
               </div>
             </div>
@@ -746,7 +762,7 @@ export function MovementsClient({ products, locations, movements, balances, supp
                             {Number(mv.quantity)}
                           </td>
                           <td className="min-w-[120px] px-4 py-3 text-xs text-gray-400 dark:text-gray-500">
-                            <span className="block break-words">{mv.note ?? '—'}</span>
+                            <span className="block break-words">{displayMovementNote(mv.note)}</span>
                           </td>
                           <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-400 dark:text-gray-500">
                             {refLabel(mv)}

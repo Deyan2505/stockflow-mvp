@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { recordMovement, type MovementInput } from '@/lib/movement-engine'
 import { findProductByBarcode } from '@/lib/barcode-utils'
-import { requirePermission } from '@/lib/current-user'
+import { requireAuthenticatedPermission } from '@/lib/current-user'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 export type { MovementInput }
@@ -21,6 +21,7 @@ export type LocationOption = {
   code: string
   warehouse_id: string
   status: string
+  is_buffer: boolean
   warehouses?: { name: string }
 }
 
@@ -72,16 +73,16 @@ export type MovementActionInput = MovementInput & {
 export async function findProductForMovement(barcode: string): Promise<ProductForMovement | null> {
   const trimmed = barcode.trim()
   if (!trimmed) return null
-  const product = await findProductByBarcode(trimmed)
+  const context = await requireAuthenticatedPermission('create_movement')
+  const product = await findProductByBarcode(trimmed, context.companyId)
   if (!product) return null
   return { id: product.id, name: product.name }
 }
 
 export async function submitMovement(input: MovementActionInput): Promise<MovementResult> {
   try {
-    await requirePermission('create_movement')
-
-    const co = process.env.DEMO_COMPANY_ID!
+    const context = await requireAuthenticatedPermission('create_movement')
+    const co = context.companyId
     const updatedInput: MovementInput = {
       movement_type: input.movement_type,
       product_id: input.product_id,
@@ -141,7 +142,7 @@ export async function submitMovement(input: MovementActionInput): Promise<Moveme
       updatedInput.reference_type = 'customer'
     }
 
-    await recordMovement(updatedInput)
+    await recordMovement(updatedInput, context)
 
     revalidatePath('/')
     revalidatePath('/movements')

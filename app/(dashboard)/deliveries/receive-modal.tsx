@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useTransition } from 'react'
-import { X } from 'lucide-react'
+import { useState, useTransition, useMemo } from 'react'
+import { X, Plus, Trash2 } from 'lucide-react'
 import {
   type Delivery,
   type ReceiveDeliveryInput,
@@ -11,12 +11,21 @@ import { useT } from '@/lib/i18n'
 
 type ProductOption = { id: string; name: string; unit: string }
 type LocationOption = { id: string; code: string }
+type OccupancyRow = { location_id: string; product_id: string }
+
+type LocStatus = 'empty' | 'same' | 'other'
 
 type Props = {
   delivery: Delivery
   products: ProductOption[]
   locations: LocationOption[]
+  occupancy: OccupancyRow[]
   onClose: (successMsg?: string) => void
+}
+
+type Placement = {
+  location_id: string
+  quantity: string
 }
 
 type ReceiveRow = {
@@ -28,7 +37,7 @@ type ReceiveRow = {
   already_received: number
   remaining: number
   quantity_to_receive: string
-  location_id: string
+  placements: Placement[]
 }
 
 function initRows(
@@ -38,11 +47,12 @@ function initRows(
 ): ReceiveRow[] {
   return delivery.incoming_delivery_items.map((item) => {
     const product = products.find((p) => p.id === item.product_id)
-    const location = locations.find((l) => l.id === (item.location_id ?? ''))
+    const seededLocation = locations.find((l) => l.id === (item.location_id ?? ''))
     const remaining = Math.max(
       0,
       Number(item.expected_quantity) - Number(item.received_quantity)
     )
+    const qtyToReceive = remaining > 0 ? String(remaining) : '0'
     return {
       item_id: item.id,
       product_id: item.product_id,
@@ -51,13 +61,28 @@ function initRows(
       expected_quantity: Number(item.expected_quantity),
       already_received: Number(item.received_quantity),
       remaining,
-      quantity_to_receive: remaining > 0 ? String(remaining) : '0',
-      location_id: item.location_id ?? (location?.id ?? ''),
+      quantity_to_receive: qtyToReceive,
+      // Seed a single placement from the item's existing location (backward compat).
+      // Its quantity mirrors the full remaining so single-location receiving is a
+      // one-click confirm; the user can split further from here.
+      placements: [
+        {
+          location_id: seededLocation?.id ?? (item.location_id ?? ''),
+          quantity: remaining > 0 ? String(remaining) : '',
+        },
+      ],
     }
   })
 }
 
-export function ReceiveModal({ delivery, products, locations, onClose }: Props) {
+function assignedOf(row: ReceiveRow): number {
+  return row.placements.reduce((sum, p) => {
+    const n = Number(p.quantity)
+    return sum + (Number.isFinite(n) ? n : 0)
+  }, 0)
+}
+
+export function ReceiveModal({ delivery, products, locations, occupancy, onClose }: Props) {
   const { t } = useT()
   const d = t.deliveries
 
@@ -67,21 +92,98 @@ export function ReceiveModal({ delivery, products, locations, onClose }: Props) 
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
-  const setRowQty = (idx: number, val: string) =>
-    setRows((prev) => prev.map((r, i) => (i === idx ? { ...r, quantity_to_receive: val } : r)))
+  // location_id → set of product_ids currently holding stock there (quantity > 0)
+  const occByLocation = useMemo(() => {
+    const map = new Map<string, Set<string>>()
+    for (const o of occupancy) {
+      let s = map.get(o.location_id)
+      if (!s) { s = new Set<string>(); map.set(o.location_id, s) }
+      s.add(o.product_id)
+    }
+    return map
+  }, [occupancy])
 
-  const setRowLocation = (idx: number, locationId: string) =>
-    setRows((prev) =>
-      prev.map((r, i) => (i === idx ? { ...r, location_id: locationId } : r))
-    )
+  // Occupancy of a location relative to the product being received:
+  // 'other' = holds a different product (no-mixed-products → blocked),
+  // 'same'  = already holds this product, 'empty' = holds nothing.
+  const locStatus = (locationId: string, productId: string): LocStatus => {
+    const occupants = occByLocation.get(locationId)
+    if (!occupants || occupants.size === 0) return 'empty'
+    if (occupants.size === 1 && occupants.has(productId)) return 'same'
+    return 'other'
+  }
+
+  const locLabel = (l: LocationOption, productId: string): string => {
+    const status = locStatus(l.id, productId)
+    const suffix =
+      status === 'other' ? d.locOtherProduct
+      : status === 'same' ? d.locSameProduct
+      : d.locEmpty
+    return `${l.code} — ${suffix}`
+  }
+
+  const updateRow = (idx: number, patch: (r: ReceiveRow) => ReceiveRow) =>
+    setRows((prev) => prev.map((r, i) => (i === idx ? patch(r) : r)))
+
+  const setRowQty = (idx: number, val: string) =>
+    updateRow(idx, (r) => {
+      // If the item has a single placement, keep it in sync for frictionless
+      // single-location receiving. With multiple placements the user manages them.
+      if (r.placements.length === 1) {
+        return {
+          ...r,
+          quantity_to_receive: val,
+          placements: [{ ...r.placements[0], quantity: val }],
+        }
+      }
+      return { ...r, quantity_to_receive: val }
+    })
+
+  const setPlacementLocation = (idx: number, pIdx: number, locationId: string) =>
+    updateRow(idx, (r) => ({
+      ...r,
+      placements: r.placements.map((p, i) =>
+        i === pIdx ? { ...p, location_id: locationId } : p
+      ),
+    }))
+
+  const setPlacementQty = (idx: number, pIdx: number, val: string) =>
+    updateRow(idx, (r) => ({
+      ...r,
+      placements: r.placements.map((p, i) =>
+        i === pIdx ? { ...p, quantity: val } : p
+      ),
+    }))
+
+  const addPlacement = (idx: number) =>
+    updateRow(idx, (r) => ({
+      ...r,
+      placements: [...r.placements, { location_id: '', quantity: '' }],
+    }))
+
+  const removePlacement = (idx: number, pIdx: number) =>
+    updateRow(idx, (r) => {
+      // Always keep at least one placement row while this item is being received
+      if (r.placements.length <= 1) return r
+      return { ...r, placements: r.placements.filter((_, i) => i !== pIdx) }
+    })
 
   const validate = (): string | null => {
-    const hasAny = rows.some((r) => Number(r.quantity_to_receive) > 0)
-    if (!hasAny) return d.errNothingToReceive
-    for (const row of rows) {
+    const activeRows = rows.filter((r) => Number(r.quantity_to_receive) > 0)
+    if (activeRows.length === 0) return d.errNothingToReceive
+
+    for (const row of activeRows) {
       const qty = Number(row.quantity_to_receive)
       if (qty < 0 || qty > row.remaining) return d.errExceedsExpected
-      if (qty > 0 && !row.location_id) return d.errLocationRequired
+
+      for (const p of row.placements) {
+        if (!p.location_id) return d.errPlacementLocationRequired
+        const pQty = Number(p.quantity)
+        if (!pQty || pQty <= 0) return d.errPlacementQty
+        if (locStatus(p.location_id, row.product_id) === 'other') return d.errMixedProduct
+      }
+
+      if (Math.abs(assignedOf(row) - qty) > 1e-6) return d.errPlacementMismatch
     }
     return null
   }
@@ -101,7 +203,10 @@ export function ReceiveModal({ delivery, products, locations, onClose }: Props) 
           item_id: r.item_id,
           product_id: r.product_id,
           quantity_to_receive: Number(r.quantity_to_receive),
-          location_id: r.location_id,
+          placements: r.placements.map((p) => ({
+            location_id: p.location_id,
+            quantity: Number(p.quantity),
+          })),
         })),
     }
 
@@ -151,92 +256,150 @@ export function ReceiveModal({ delivery, products, locations, onClose }: Props) 
                 {d.errAlreadyReceived}
               </p>
             ) : (
-              <div className="rounded-lg border border-gray-200 dark:border-gray-700">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-gray-200 dark:border-gray-700">
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-400">
-                        {d.fProduct}
-                      </th>
-                      <th className="w-12 px-3 py-2 text-left text-xs font-medium text-gray-400">
-                        {d.colUnit}
-                      </th>
-                      <th className="w-20 px-3 py-2 text-right text-xs font-medium text-gray-400">
-                        {d.colExpected}
-                      </th>
-                      <th className="w-20 px-3 py-2 text-right text-xs font-medium text-gray-400">
-                        {d.colAlreadyReceived}
-                      </th>
-                      <th className="w-28 px-3 py-2 text-left text-xs font-medium text-gray-400">
-                        {d.colToReceive}
-                      </th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-400">
-                        {d.fLocation}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                    {rows.map((row, idx) => {
-                      const isDone = row.remaining === 0
+              <>
+                <p className="mb-4 text-xs text-gray-500 dark:text-gray-400">
+                  {d.putawayHelper}
+                </p>
+                <div className="space-y-4">
+                  {rows.map((row, idx) => {
+                    const isDone = row.remaining === 0
+                    if (isDone) {
                       return (
-                        <tr
+                        <div
                           key={row.item_id}
-                          className={isDone ? 'opacity-40' : ''}
+                          className="flex items-center justify-between rounded-lg border border-gray-100 px-4 py-3 opacity-50 dark:border-gray-800"
                         >
-                          <td className="px-3 py-2 font-medium text-gray-900 dark:text-white">
+                          <span className="text-sm font-medium text-gray-900 dark:text-white">
                             {row.product_name}
-                          </td>
-                          <td className="px-3 py-2 text-xs text-gray-400 dark:text-gray-500">
-                            {row.unit}
-                          </td>
-                          <td className="px-3 py-2 text-right tabular-nums text-gray-500 dark:text-gray-400">
-                            {row.expected_quantity}
-                          </td>
-                          <td className="px-3 py-2 text-right tabular-nums">
-                            {row.already_received > 0 ? (
-                              <span className="font-medium text-green-600 dark:text-green-400">
-                                {row.already_received}
-                              </span>
-                            ) : (
-                              <span className="text-gray-400">0</span>
-                            )}
-                          </td>
-                          <td className="px-3 py-2">
+                          </span>
+                          <span className="text-xs text-gray-400">
+                            {d.colAlreadyReceived}: {row.already_received} {row.unit}
+                          </span>
+                        </div>
+                      )
+                    }
+
+                    const assigned = assignedOf(row)
+                    const target = Number(row.quantity_to_receive) || 0
+                    const balanced = Math.abs(assigned - target) < 1e-6 && target > 0
+
+                    return (
+                      <div
+                        key={row.item_id}
+                        className="rounded-lg border border-gray-200 p-4 dark:border-gray-700"
+                      >
+                        {/* Item header */}
+                        <div className="mb-3 flex items-start justify-between gap-4">
+                          <div>
+                            <p className="font-medium text-gray-900 dark:text-white">
+                              {row.product_name}
+                            </p>
+                            <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500">
+                              {d.colExpected}: {row.remaining} {row.unit}
+                              {row.already_received > 0 && (
+                                <>
+                                  {' · '}
+                                  {d.colAlreadyReceived}: {row.already_received}
+                                </>
+                              )}
+                            </p>
+                          </div>
+                          <div className="shrink-0">
+                            <label className="mb-1 block text-right text-xs font-medium text-gray-400">
+                              {d.putawayColQty}
+                            </label>
                             <input
                               type="number"
                               min="0"
                               max={row.remaining}
-                              step="0.01"
+                              step="1"
                               value={row.quantity_to_receive}
                               onChange={(e) => setRowQty(idx, e.target.value)}
-                              disabled={isDone}
-                              className={cellCls + ' text-center'}
+                              className={cellCls + ' w-28 text-center'}
                             />
-                          </td>
-                          <td className="px-3 py-2">
-                            {isDone ? (
-                              <span className="text-xs text-gray-400">—</span>
-                            ) : (
+                          </div>
+                        </div>
+
+                        {/* Placements */}
+                        <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
+                          {d.putawayPlacementsTitle}
+                        </p>
+                        <div className="space-y-2">
+                          {row.placements.map((p, pIdx) => (
+                            <div key={pIdx} className="flex items-center gap-2">
                               <select
-                                value={row.location_id}
-                                onChange={(e) => setRowLocation(idx, e.target.value)}
-                                className={cellCls}
+                                value={p.location_id}
+                                onChange={(e) =>
+                                  setPlacementLocation(idx, pIdx, e.target.value)
+                                }
+                                className={cellCls + ' flex-1'}
                               >
-                                <option value="">—</option>
-                                {locations.map((l) => (
-                                  <option key={l.id} value={l.id}>
-                                    {l.code}
-                                  </option>
-                                ))}
+                                <option value="">{d.selectLocation}</option>
+                                {locations.map((l) => {
+                                  const occupied =
+                                    locStatus(l.id, row.product_id) === 'other'
+                                  return (
+                                    <option
+                                      key={l.id}
+                                      value={l.id}
+                                      disabled={occupied}
+                                    >
+                                      {locLabel(l, row.product_id)}
+                                    </option>
+                                  )
+                                })}
                               </select>
-                            )}
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                              <input
+                                type="number"
+                                min="0"
+                                step="1"
+                                value={p.quantity}
+                                onChange={(e) =>
+                                  setPlacementQty(idx, pIdx, e.target.value)
+                                }
+                                placeholder="0"
+                                className={cellCls + ' w-24 text-center'}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => removePlacement(idx, pIdx)}
+                                disabled={row.placements.length <= 1}
+                                title={d.removeLocation}
+                                aria-label={d.removeLocation}
+                                className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-30 dark:hover:bg-gray-800"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Add location + counter */}
+                        <div className="mt-3 flex items-center justify-between">
+                          <button
+                            type="button"
+                            onClick={() => addPlacement(idx)}
+                            className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:underline dark:text-blue-400"
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                            {d.addLocation}
+                          </button>
+                          <span
+                            className={
+                              'text-xs font-medium tabular-nums ' +
+                              (balanced
+                                ? 'text-green-600 dark:text-green-400'
+                                : 'text-amber-600 dark:text-amber-400')
+                            }
+                          >
+                            {d.assigned}: {assigned} / {target} {row.unit}
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </>
             )}
           </div>
 
