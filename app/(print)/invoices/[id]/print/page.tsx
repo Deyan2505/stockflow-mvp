@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { getCurrentUserContext } from '@/lib/current-user'
 import { can } from '@/lib/permissions'
 import { PrintButton } from './print-button'
@@ -165,7 +166,7 @@ export default async function InvoicePrintPage({ params }: { params: { id: strin
 
   const invoice = rawInvoice as unknown as InvoiceRow
   const orderPromise = invoice.outgoing_order_id
-    ? sb
+    ? createAdminClient()
         .from('outgoing_orders')
         .select('id, order_number, customer_name')
         .eq('id', invoice.outgoing_order_id)
