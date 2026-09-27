@@ -4,9 +4,19 @@ import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { findProductByBarcode } from '@/lib/barcode-utils'
 import { recordMovement } from '@/lib/movement-engine'
-import { requireAuthenticatedPermission, requirePermission } from '@/lib/current-user'
+import { getCurrentUserContext, requireAuthenticatedPermission, requirePermission } from '@/lib/current-user'
 
-const CO = process.env.DEMO_COMPANY_ID!
+async function requireOwnedOrder(sb: ReturnType<typeof createAdminClient>, orderId: string, companyId: string) {
+  const { data, error } = await sb.from('outgoing_orders').select('id')
+    .eq('id', orderId).eq('company_id', companyId).maybeSingle()
+  if (error || !data) throw new Error('Поръчката не е намерена')
+}
+
+async function requireOwnedCustomer(sb: ReturnType<typeof createAdminClient>, customerId: string, companyId: string) {
+  const { data, error } = await sb.from('customers').select('id')
+    .eq('id', customerId).eq('company_id', companyId).maybeSingle()
+  if (error || !data) throw new Error('Клиентът не е намерен')
+}
 
 // v0.6 Step 1: header CRUD — no fulfillment, no stock movements
 // v0.6 Step 2: order items CRUD — no fulfillment, no stock movements, no inventory change
@@ -62,12 +72,13 @@ export type OrderItemResult = { success: true } | { success: false; error: strin
 
 export async function createOrder(input: OrderInput): Promise<OrderResult> {
   try {
-    await requirePermission('manage_orders')
+    const { companyId: CO } = await requirePermission('manage_orders')
     const sb = createAdminClient()
 
     if (!input.customer_id) {
       throw new Error('errCustomerRequired')
     }
+    await requireOwnedCustomer(sb, input.customer_id, CO)
 
     const { error } = await sb
       .from('outgoing_orders')
@@ -96,8 +107,10 @@ export async function createOrder(input: OrderInput): Promise<OrderResult> {
 
 export async function updateOrder(id: string, input: OrderInput): Promise<OrderResult> {
   try {
-    await requirePermission('manage_orders')
+    const { companyId: CO } = await requirePermission('manage_orders')
     const sb = createAdminClient()
+    await requireOwnedOrder(sb, id, CO)
+    if (input.customer_id) await requireOwnedCustomer(sb, input.customer_id, CO)
 
     const { error } = await sb
       .from('outgoing_orders')
@@ -127,8 +140,9 @@ export async function updateOrder(id: string, input: OrderInput): Promise<OrderR
 
 export async function cancelOrder(id: string): Promise<OrderResult> {
   try {
-    await requirePermission('manage_orders')
+    const { companyId: CO } = await requirePermission('manage_orders')
     const sb = createAdminClient()
+    await requireOwnedOrder(sb, id, CO)
     const { error } = await sb
       .from('outgoing_orders')
       .update({ status: 'cancelled' })
@@ -147,10 +161,10 @@ export async function cancelOrder(id: string): Promise<OrderResult> {
 // Never creates stock movements or modifies inventory balances.
 
 export async function findProductForOrder(barcode: string): Promise<{ id: string; name: string } | null> {
+  await requireAuthenticatedPermission('manage_orders')
   const trimmed = barcode.trim()
   if (!trimmed) return null
-  const context = await requireAuthenticatedPermission('manage_orders')
-  const product = await findProductByBarcode(trimmed, context.companyId)
+  const product = await findProductByBarcode(trimmed)
   if (!product) return null
   return { id: product.id, name: product.name }
 }
@@ -159,12 +173,17 @@ export async function findProductForOrder(barcode: string): Promise<{ id: string
 // None of these create stock movements or touch inventory_balances.
 
 export async function getOrderItems(orderId: string): Promise<OrderItem[]> {
+  const { companyId: CO } = await getCurrentUserContext()
   const sb = createAdminClient()
-  const { data } = await sb
+  await requireOwnedOrder(sb, orderId, CO)
+  const { data, error } = await sb
     .from('outgoing_order_items')
     .select('id, order_id, product_id, ordered_quantity, issued_quantity, location_id, created_at, products(name, unit)')
     .eq('order_id', orderId)
+    .eq('company_id', CO)
+    .eq('products.company_id', CO)
     .order('created_at', { ascending: true })
+  if (error) throw new Error(error.message)
   return (data ?? []) as unknown as OrderItem[]
 }
 
@@ -173,10 +192,14 @@ export async function addOrderItem(
   productId: string,
   quantity: number
 ): Promise<OrderItemResult> {
-  if (quantity <= 0) return { success: false, error: 'Количеството трябва да е положително' }
   try {
-    await requirePermission('manage_orders')
+    const { companyId: CO } = await requirePermission('manage_orders')
+    if (quantity <= 0) return { success: false, error: 'Количеството трябва да е положително' }
     const sb = createAdminClient()
+    await requireOwnedOrder(sb, orderId, CO)
+    const { data: product } = await sb.from('products').select('id')
+      .eq('id', productId).eq('company_id', CO).maybeSingle()
+    if (!product) throw new Error('Продуктът не е намерен')
     const { error } = await sb
       .from('outgoing_order_items')
       .insert({
@@ -200,14 +223,19 @@ export async function updateOrderItem(
   itemId: string,
   quantity: number
 ): Promise<OrderItemResult> {
-  if (quantity <= 0) return { success: false, error: 'Количеството трябва да е положително' }
   try {
-    await requirePermission('manage_orders')
+    const { companyId: CO } = await requirePermission('manage_orders')
+    if (quantity <= 0) return { success: false, error: 'Количеството трябва да е положително' }
     const sb = createAdminClient()
+    const { data: item } = await sb.from('outgoing_order_items').select('order_id')
+      .eq('id', itemId).eq('company_id', CO).maybeSingle()
+    if (!item) throw new Error('Артикулът не е намерен')
+    await requireOwnedOrder(sb, item.order_id, CO)
     const { error } = await sb
       .from('outgoing_order_items')
       .update({ ordered_quantity: quantity })
       .eq('id', itemId)
+      .eq('company_id', CO)
     if (error) throw new Error(error.message)
     revalidatePath('/orders')
     return { success: true }
@@ -218,12 +246,17 @@ export async function updateOrderItem(
 
 export async function removeOrderItem(itemId: string): Promise<OrderItemResult> {
   try {
-    await requirePermission('manage_orders')
+    const { companyId: CO } = await requirePermission('manage_orders')
     const sb = createAdminClient()
+    const { data: item } = await sb.from('outgoing_order_items').select('order_id')
+      .eq('id', itemId).eq('company_id', CO).maybeSingle()
+    if (!item) throw new Error('Артикулът не е намерен')
+    await requireOwnedOrder(sb, item.order_id, CO)
     const { error } = await sb
       .from('outgoing_order_items')
       .delete()
       .eq('id', itemId)
+      .eq('company_id', CO)
     if (error) throw new Error(error.message)
     revalidatePath('/orders')
     return { success: true }
@@ -314,6 +347,7 @@ export async function issueOrder(input: IssueOrderInput): Promise<IssueResult> {
         .from('inventory_balances')
         .select('quantity_available, products(unit)')
         .eq('company_id', co)
+        .eq('products.company_id', co)
         .eq('product_id', item.product_id)
         .eq('location_id', item.from_location_id)
         .maybeSingle()

@@ -2,9 +2,8 @@
 
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { requirePermission } from '@/lib/current-user'
-
-const CO = process.env.DEMO_COMPANY_ID!
+import { createClient } from '@/lib/supabase/server'
+import { requireAuthenticatedPermission, requirePermission } from '@/lib/current-user'
 
 export type InvoiceStatus = 'draft' | 'issued' | 'cancelled'
 
@@ -109,10 +108,35 @@ export type PaymentResult =
 
 const round2 = (n: number) => Math.round(n * 100) / 100
 
+async function requireOwnedInvoice(sb: ReturnType<typeof createAdminClient>, invoiceId: string, companyId: string) {
+  const { data, error } = await sb.from('invoices').select('id')
+    .eq('id', invoiceId).eq('company_id', companyId).maybeSingle()
+  if (error || !data) throw new Error('Фактурата не е намерена')
+}
+
+async function requireOwnedProduct(sb: ReturnType<typeof createAdminClient>, productId: string | null, companyId: string) {
+  if (!productId) return
+  const { data, error } = await sb.from('products').select('id')
+    .eq('id', productId).eq('company_id', companyId).maybeSingle()
+  if (error || !data) throw new Error('Продуктът не е намерен')
+}
+
+async function requireOwnedInvoiceLinks(sb: ReturnType<typeof createAdminClient>, input: InvoiceInput, companyId: string) {
+  const { data: customer, error: customerError } = await sb.from('customers').select('id')
+    .eq('id', input.customer_id).eq('company_id', companyId).maybeSingle()
+  if (customerError || !customer) throw new Error('Клиентът не е намерен')
+  if (input.outgoing_order_id) {
+    const { data: order, error: orderError } = await sb.from('outgoing_orders').select('id')
+      .eq('id', input.outgoing_order_id).eq('company_id', companyId).maybeSingle()
+    if (orderError || !order) throw new Error('Поръчката не е намерена')
+  }
+}
+
 async function recalcInvoiceTotals(
   sb: ReturnType<typeof createAdminClient>,
   invoiceId: string,
-  vatRate: number
+  vatRate: number,
+  CO: string
 ) {
   const { data: rows, error: rowsError } = await sb
     .from('invoice_items')
@@ -134,7 +158,8 @@ async function recalcInvoiceTotals(
 async function recalcPaymentStatus(
   sb: ReturnType<typeof createAdminClient>,
   invoiceId: string,
-  invoiceTotal: number
+  invoiceTotal: number,
+  CO: string
 ) {
   const { data, error } = await sb
     .from('invoice_payments')
@@ -158,7 +183,9 @@ async function recalcPaymentStatus(
 }
 
 export async function getInvoicePayments(invoiceId: string): Promise<InvoicePayment[]> {
+  const { companyId: CO } = await requireAuthenticatedPermission('view_invoices')
   const sb = createAdminClient()
+  await requireOwnedInvoice(sb, invoiceId, CO)
   const { data, error } = await sb
     .from('invoice_payments')
     .select('*')
@@ -174,7 +201,7 @@ export async function recordPayment(
   input: PaymentInput
 ): Promise<PaymentResult> {
   try {
-    await requirePermission('manage_invoices')
+    const { companyId: CO } = await requirePermission('manage_invoices')
     const sb = createAdminClient()
     const amount = round2(Number(input.amount))
     if (!Number.isFinite(amount) || amount <= 0) throw new Error('errPaymentAmount')
@@ -198,7 +225,7 @@ export async function recordPayment(
       note: input.note?.trim() || null,
     })
     if (error) throw new Error(error.message)
-    await recalcPaymentStatus(sb, invoiceId, total)
+    await recalcPaymentStatus(sb, invoiceId, total, CO)
     revalidatePath('/invoices')
     return { success: true }
   } catch (err) {
@@ -208,7 +235,7 @@ export async function recordPayment(
 
 export async function deletePayment(paymentId: string): Promise<PaymentResult> {
   try {
-    await requirePermission('manage_invoices')
+    const { companyId: CO } = await requirePermission('manage_invoices')
     const sb = createAdminClient()
     const { data: payment, error: paymentError } = await sb
       .from('invoice_payments')
@@ -231,7 +258,7 @@ export async function deletePayment(paymentId: string): Promise<PaymentResult> {
       .eq('id', paymentId)
       .eq('company_id', CO)
     if (error) throw new Error(error.message)
-    await recalcPaymentStatus(sb, payment.invoice_id, Number(invoice.total || 0))
+    await recalcPaymentStatus(sb, payment.invoice_id, Number(invoice.total || 0), CO)
     revalidatePath('/invoices')
     return { success: true }
   } catch (err) {
@@ -240,18 +267,18 @@ export async function deletePayment(paymentId: string): Promise<PaymentResult> {
 }
 
 export async function getInvoiceItems(invoiceId: string): Promise<InvoiceItem[]> {
-  try {
-    const sb = createAdminClient()
-    const { data } = await sb
-      .from('invoice_items')
-      .select('*, products(name, unit)')
-      .eq('invoice_id', invoiceId)
-      .eq('company_id', CO)
-      .order('created_at', { ascending: true })
-    return (data ?? []) as unknown as InvoiceItem[]
-  } catch {
-    return []
-  }
+  const { companyId: CO } = await requireAuthenticatedPermission('view_invoices')
+  const sb = createAdminClient()
+  await requireOwnedInvoice(sb, invoiceId, CO)
+  const { data, error } = await sb
+    .from('invoice_items')
+    .select('*, products(name, unit)')
+    .eq('invoice_id', invoiceId)
+    .eq('company_id', CO)
+    .eq('products.company_id', CO)
+    .order('created_at', { ascending: true })
+  if (error) throw new Error(error.message)
+  return (data ?? []) as unknown as InvoiceItem[]
 }
 
 export async function addInvoiceItem(
@@ -259,7 +286,7 @@ export async function addInvoiceItem(
   input: InvoiceItemInput
 ): Promise<InvoiceItemResult> {
   try {
-    await requirePermission('manage_invoices')
+    const { companyId: CO } = await requirePermission('manage_invoices')
     if (!input.description.trim()) throw new Error('errItemDesc')
     if (input.quantity <= 0) throw new Error('errItemQty')
     if (input.unit_price < 0) throw new Error('errItemUnitPrice')
@@ -272,6 +299,7 @@ export async function addInvoiceItem(
       .single()
     if (!inv) throw new Error('Фактурата не е намерена')
     if (inv.status !== 'draft') throw new Error('errLocked')
+    await requireOwnedProduct(sb, input.product_id, CO)
     const amount = round2(input.quantity * input.unit_price)
     const { error } = await sb.from('invoice_items').insert({
       invoice_id: invoiceId,
@@ -283,7 +311,7 @@ export async function addInvoiceItem(
       amount,
     })
     if (error) throw new Error(error.message)
-    await recalcInvoiceTotals(sb, invoiceId, Number(inv.vat_rate))
+    await recalcInvoiceTotals(sb, invoiceId, Number(inv.vat_rate), CO)
     revalidatePath('/invoices')
     return { success: true }
   } catch (err) {
@@ -296,7 +324,7 @@ export async function updateInvoiceItem(
   input: InvoiceItemInput
 ): Promise<InvoiceItemResult> {
   try {
-    await requirePermission('manage_invoices')
+    const { companyId: CO } = await requirePermission('manage_invoices')
     if (!input.description.trim()) throw new Error('errItemDesc')
     if (input.quantity <= 0) throw new Error('errItemQty')
     if (input.unit_price < 0) throw new Error('errItemUnitPrice')
@@ -315,6 +343,7 @@ export async function updateInvoiceItem(
       .eq('company_id', CO)
       .single()
     if (!inv || inv.status !== 'draft') throw new Error('errLocked')
+    await requireOwnedProduct(sb, input.product_id, CO)
     const amount = round2(input.quantity * input.unit_price)
     const { error } = await sb
       .from('invoice_items')
@@ -328,7 +357,7 @@ export async function updateInvoiceItem(
       .eq('id', itemId)
       .eq('company_id', CO)
     if (error) throw new Error(error.message)
-    await recalcInvoiceTotals(sb, existingItem.invoice_id, Number(inv.vat_rate))
+    await recalcInvoiceTotals(sb, existingItem.invoice_id, Number(inv.vat_rate), CO)
     revalidatePath('/invoices')
     return { success: true }
   } catch (err) {
@@ -338,7 +367,7 @@ export async function updateInvoiceItem(
 
 export async function removeInvoiceItem(itemId: string): Promise<InvoiceItemResult> {
   try {
-    await requirePermission('manage_invoices')
+    const { companyId: CO } = await requirePermission('manage_invoices')
     const sb = createAdminClient()
     const { data: existingItem } = await sb
       .from('invoice_items')
@@ -360,7 +389,7 @@ export async function removeInvoiceItem(itemId: string): Promise<InvoiceItemResu
       .eq('id', itemId)
       .eq('company_id', CO)
     if (error) throw new Error(error.message)
-    await recalcInvoiceTotals(sb, existingItem.invoice_id, Number(inv.vat_rate))
+    await recalcInvoiceTotals(sb, existingItem.invoice_id, Number(inv.vat_rate), CO)
     revalidatePath('/invoices')
     return { success: true }
   } catch (err) {
@@ -370,7 +399,7 @@ export async function removeInvoiceItem(itemId: string): Promise<InvoiceItemResu
 
 export async function importOrderItems(invoiceId: string): Promise<InvoiceResult> {
   try {
-    await requirePermission('manage_invoices')
+    const { companyId: CO } = await requirePermission('manage_invoices')
     const sb = createAdminClient()
 
     const { data: inv } = await sb
@@ -383,6 +412,9 @@ export async function importOrderItems(invoiceId: string): Promise<InvoiceResult
     if (!inv) throw new Error('Фактурата не е намерена')
     if (inv.status !== 'draft') throw new Error('errLocked')
     if (!inv.outgoing_order_id) throw new Error('errNoOrderLink')
+    const { data: order } = await sb.from('outgoing_orders').select('id')
+      .eq('id', inv.outgoing_order_id).eq('company_id', CO).maybeSingle()
+    if (!order) throw new Error('Поръчката не е намерена')
 
     const { count: existingCount } = await sb
       .from('invoice_items')
@@ -397,9 +429,12 @@ export async function importOrderItems(invoiceId: string): Promise<InvoiceResult
       .from('outgoing_order_items')
       .select('product_id, ordered_quantity, products(name, sale_price)')
       .eq('order_id', inv.outgoing_order_id)
+      .eq('company_id', CO)
+      .eq('products.company_id', CO)
       .order('created_at', { ascending: true })
 
     if (!orderItems || orderItems.length === 0) throw new Error('errNoOrderItems')
+    if (orderItems.some((item) => !item.products)) throw new Error('errNoOrderItems')
 
     const rows = orderItems.map((oi) => {
       const product = oi.products as unknown as { name: string; sale_price: number | null } | null
@@ -419,7 +454,7 @@ export async function importOrderItems(invoiceId: string): Promise<InvoiceResult
     const { error } = await sb.from('invoice_items').insert(rows)
     if (error) throw new Error(error.message)
 
-    await recalcInvoiceTotals(sb, invoiceId, Number(inv.vat_rate))
+    await recalcInvoiceTotals(sb, invoiceId, Number(inv.vat_rate), CO)
 
     revalidatePath('/invoices')
     return { success: true }
@@ -434,28 +469,16 @@ export async function importOrderItems(invoiceId: string): Promise<InvoiceResult
 export async function issueInvoice(id: string): Promise<InvoiceResult> {
   try {
     await requirePermission('issue_invoice')
-    const sb = createAdminClient()
-    const { data: inv } = await sb
-      .from('invoices')
-      .select('status, vat_rate')
-      .eq('id', id)
-      .eq('company_id', CO)
-      .single()
-    if (!inv) throw new Error('Фактурата не е намерена')
-    if (inv.status !== 'draft') throw new Error('errLocked')
-    const { data: items } = await sb
-      .from('invoice_items')
-      .select('id')
-      .eq('invoice_id', id)
-      .eq('company_id', CO)
-    if (!items || items.length === 0) throw new Error('errIssueNoItems')
-    await recalcInvoiceTotals(sb, id, Number(inv.vat_rate))
-    const { error } = await sb
-      .from('invoices')
-      .update({ status: 'issued' })
-      .eq('id', id)
-      .eq('company_id', CO)
-    if (error) throw new Error(error.message)
+    const sb = await createClient()
+    const { error } = await sb.rpc('issue_invoice', { p_invoice_id: id })
+    if (error) {
+      if (error.message.includes('INVOICE_ITEMS_REQUIRED')) throw new Error('errIssueNoItems')
+      if (error.message.includes('INVOICE_LOCKED')) throw new Error('errLocked')
+      if (error.message.includes('ISSUER_SETTINGS_REQUIRED')) throw new Error('errIssuerSettingsRequired')
+      if (error.message.includes('INVOICE_NOT_FOUND')) throw new Error('Фактурата не е намерена')
+      if (error.message.includes('INVOICE_TENANT_LINK_INVALID')) throw new Error('errInvoiceTenantLink')
+      throw new Error(error.message)
+    }
     revalidatePath('/invoices')
     return { success: true }
   } catch (err) {
@@ -465,8 +488,9 @@ export async function issueInvoice(id: string): Promise<InvoiceResult> {
 
 export async function createInvoice(input: InvoiceInput): Promise<InvoiceResult> {
   try {
-    await requirePermission('manage_invoices')
+    const { companyId: CO } = await requirePermission('manage_invoices')
     const sb = createAdminClient()
+    await requireOwnedInvoiceLinks(sb, input, CO)
     const { error } = await sb.from('invoices').insert({
       company_id: CO,
       invoice_number: input.invoice_number.trim(),
@@ -491,7 +515,7 @@ export async function createInvoice(input: InvoiceInput): Promise<InvoiceResult>
 
 export async function updateInvoice(id: string, input: InvoiceInput): Promise<InvoiceResult> {
   try {
-    await requirePermission('manage_invoices')
+    const { companyId: CO } = await requirePermission('manage_invoices')
     const sb = createAdminClient()
     const { data: existing } = await sb
       .from('invoices')
@@ -501,6 +525,7 @@ export async function updateInvoice(id: string, input: InvoiceInput): Promise<In
       .single()
     if (!existing) throw new Error('Фактурата не е намерена')
     if (existing.status !== 'draft') throw new Error('errLocked')
+    await requireOwnedInvoiceLinks(sb, input, CO)
     const { error } = await sb
       .from('invoices')
       .update({
@@ -527,7 +552,7 @@ export async function updateInvoice(id: string, input: InvoiceInput): Promise<In
 
 export async function cancelInvoice(id: string): Promise<InvoiceResult> {
   try {
-    await requirePermission('manage_invoices')
+    const { companyId: CO } = await requirePermission('manage_invoices')
     const sb = createAdminClient()
     const { data: existing } = await sb
       .from('invoices')

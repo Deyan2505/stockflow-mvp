@@ -47,7 +47,12 @@ export async function createLocation(input: LocationInput) {
   if (!warehouse) throw new Error('Избраният склад не принадлежи на текущата компания.')
   const { error } = await sb
     .from('locations')
-    .insert({ ...input, company_id: companyId, status: 'active' })
+    .insert({
+      warehouse_id: input.warehouse_id, code: input.code, zone: input.zone,
+      row: input.row, shelf: input.shelf, bin: input.bin,
+      max_capacity_units: input.max_capacity_units,
+      company_id: companyId, status: 'active',
+    })
   if (error) {
     if (error.code === '23505') throw new Error(`Код "${input.code}" вече съществува в този склад`)
     throw new Error(error.message)
@@ -70,7 +75,11 @@ export async function updateLocation(id: string, input: LocationInput) {
   if (!warehouse) throw new Error('Избраният склад не принадлежи на текущата компания.')
   const { error } = await sb
     .from('locations')
-    .update(input)
+    .update({
+      warehouse_id: input.warehouse_id, code: input.code, zone: input.zone,
+      row: input.row, shelf: input.shelf, bin: input.bin,
+      max_capacity_units: input.max_capacity_units,
+    })
     .eq('id', id)
     .eq('company_id', companyId)
   if (error) {

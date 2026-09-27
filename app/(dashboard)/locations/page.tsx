@@ -18,6 +18,7 @@ export default async function LocationsPage() {
         .from('locations')
         .select('*, warehouses(name)')
         .eq('company_id', companyId)
+        .eq('warehouses.company_id', companyId)
         .order('created_at', { ascending: false }),
       sb
         .from('warehouses')

@@ -7,10 +7,10 @@ import { findProductByBarcode } from '@/lib/barcode-utils'
 import { requireAuthenticatedPermission } from '@/lib/current-user'
 
 export async function findProductForDelivery(barcode: string): Promise<{ id: string; name: string } | null> {
+  await requireAuthenticatedPermission('manage_deliveries')
   const trimmed = barcode.trim()
   if (!trimmed) return null
-  const context = await requireAuthenticatedPermission('manage_deliveries')
-  const product = await findProductByBarcode(trimmed, context.companyId)
+  const product = await findProductByBarcode(trimmed)
   if (!product) return null
   return { id: product.id, name: product.name }
 }
@@ -55,10 +55,33 @@ export type DeliveryInput = {
 
 export type DeliveryResult = { success: true } | { success: false; error: string }
 
+async function validateDeliveryLinks(
+  sb: ReturnType<typeof createAdminClient>, input: DeliveryInput, companyId: string
+) {
+  const { data: supplier, error: supplierError } = await sb.from('suppliers').select('id')
+    .eq('id', input.supplier_id).eq('company_id', companyId).maybeSingle()
+  if (supplierError || !supplier) throw new Error('Доставчикът не е намерен')
+
+  const productIds = Array.from(new Set(input.items.map((item) => item.product_id)))
+  if (productIds.length) {
+    const { data, error } = await sb.from('products').select('id')
+      .eq('company_id', companyId).in('id', productIds)
+    if (error || data?.length !== productIds.length) throw new Error('Продуктът не е намерен')
+  }
+
+  const locationIds = Array.from(new Set(input.items.map((item) => item.location_id).filter((id): id is string => !!id)))
+  if (locationIds.length) {
+    const { data, error } = await sb.from('locations').select('id')
+      .eq('company_id', companyId).in('id', locationIds)
+    if (error || data?.length !== locationIds.length) throw new Error('Локацията не е намерена')
+  }
+}
+
 export async function createDelivery(input: DeliveryInput): Promise<DeliveryResult> {
   try {
     const { companyId: CO } = await requireAuthenticatedPermission('manage_deliveries')
     const sb = createAdminClient()
+    await validateDeliveryLinks(sb, input, CO)
 
     const { data: delivery, error: delErr } = await sb
       .from('incoming_deliveries')
@@ -87,7 +110,7 @@ export async function createDelivery(input: DeliveryInput): Promise<DeliveryResu
     )
 
     if (itemsErr) {
-      await sb.from('incoming_deliveries').delete().eq('id', delivery.id)
+      await sb.from('incoming_deliveries').delete().eq('id', delivery.id).eq('company_id', CO)
       throw new Error(itemsErr.message)
     }
 
@@ -102,6 +125,10 @@ export async function updateDelivery(id: string, input: DeliveryInput): Promise<
   try {
     const { companyId: CO } = await requireAuthenticatedPermission('manage_deliveries')
     const sb = createAdminClient()
+    const { data: existing } = await sb.from('incoming_deliveries').select('id')
+      .eq('id', id).eq('company_id', CO).maybeSingle()
+    if (!existing) throw new Error('Доставката не е намерена')
+    await validateDeliveryLinks(sb, input, CO)
 
     const { error: delErr } = await sb
       .from('incoming_deliveries')

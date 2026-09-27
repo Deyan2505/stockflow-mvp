@@ -3,13 +3,12 @@ export const dynamic = 'force-dynamic'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { LowStockClient, type LowStockProduct } from './low-stock-client'
 import { DeliveryReportsClient, type DeliveryReport } from './delivery-reports-client'
-import { getCurrentRole } from '@/lib/current-user'
+import { getCurrentUserContext } from '@/lib/current-user'
 import { can } from '@/lib/permissions'
 
-const CO = process.env.DEMO_COMPANY_ID!
 
 export default async function ReportsPage() {
-  const role = await getCurrentRole()
+  const { companyId: CO, role } = await getCurrentUserContext()
   const canExport = can(role, 'export_reports')
   const sb = createAdminClient()
 
@@ -29,7 +28,9 @@ export default async function ReportsPage() {
     sb
       .from('inventory_balances')
       .select('product_id, location_id, quantity_available, locations(id, code, warehouse_id, warehouses(name))')
-      .eq('company_id', CO),
+      .eq('company_id', CO)
+      .eq('locations.company_id', CO)
+      .eq('locations.warehouses.company_id', CO),
     sb
       .from('warehouses')
       .select('id, name')
@@ -39,6 +40,8 @@ export default async function ReportsPage() {
       .from('incoming_deliveries')
       .select('id, delivery_number, status, expected_date, received_date, supplier_id, suppliers(name), incoming_delivery_items(expected_quantity, received_quantity)')
       .eq('company_id', CO)
+      .eq('suppliers.company_id', CO)
+      .eq('incoming_delivery_items.company_id', CO)
       .order('created_at', { ascending: false }),
     sb
       .from('suppliers')

@@ -19,6 +19,8 @@ export default async function DeliveriesPage() {
         '*, suppliers(name), incoming_delivery_items(id, product_id, expected_quantity, received_quantity, location_id)'
       )
       .eq('company_id', CO)
+      .eq('suppliers.company_id', CO)
+      .eq('incoming_delivery_items.company_id', CO)
       .order('created_at', { ascending: false }),
     sb.from('suppliers').select('id, name').eq('company_id', CO).eq('status', 'active').order('name'),
     sb.from('products').select('id, name, unit').eq('company_id', CO).eq('status', 'active'),

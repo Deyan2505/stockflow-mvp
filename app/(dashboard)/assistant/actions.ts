@@ -1,7 +1,7 @@
 'use server'
 
 import OpenAI from 'openai'
-import { getCurrentRole } from '@/lib/current-user'
+import { getCurrentUserContext } from '@/lib/current-user'
 import { TOOL_SCHEMAS, executeTool } from './tools'
 
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4.1-mini'
@@ -21,7 +21,7 @@ export async function askAssistant(
 ): Promise<AssistantResult> {
   try {
     // 1. Ensure authenticated
-    const role = await getCurrentRole()
+    const { role } = await getCurrentUserContext()
 
     // 2. Validate — last message must be a non-empty user turn
     if (!messages.length) return { success: false, error: 'errGeneric' }

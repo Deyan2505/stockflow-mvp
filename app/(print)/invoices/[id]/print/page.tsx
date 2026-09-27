@@ -2,12 +2,11 @@ export const dynamic = 'force-dynamic'
 
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { createAdminClient } from '@/lib/supabase/admin'
-import { getCurrentRole } from '@/lib/current-user'
+import { createClient } from '@/lib/supabase/server'
+import { getCurrentUserContext } from '@/lib/current-user'
 import { can } from '@/lib/permissions'
 import { PrintButton } from './print-button'
 
-const CO = process.env.DEMO_COMPANY_ID!
 
 const fmtDate = (d?: string | null) =>
   d ? d.split('-').reverse().join('.') : '—'
@@ -85,6 +84,8 @@ type OrderJoin = {
 
 type InvoiceRow = {
   id: string
+  customer_id: string
+  outgoing_order_id: string | null
   invoice_number: string
   status: string
   invoice_date: string
@@ -96,8 +97,6 @@ type InvoiceRow = {
   total: number
   amount_paid: number
   payment_status: string
-  customers: CustomerJoin
-  outgoing_orders: OrderJoin
 }
 
 type ItemRow = {
@@ -106,11 +105,37 @@ type ItemRow = {
   quantity: number
   unit_price: number
   amount: number
-  products: { name: string; unit: string | null } | null
+}
+
+type IssuerSnapshot = {
+  legal_name: string
+  address: string
+  eik: string
+  vat_number: string | null
+  mol: string
+  email: string | null
+  phone: string | null
+  bank_name: string | null
+  iban: string | null
+  bic: string | null
+}
+
+function PrintUnavailable({ message }: { message: string }) {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-white p-8">
+      <div className="max-w-lg rounded-xl border border-red-200 bg-red-50 p-6 text-center">
+        <h1 className="text-lg font-semibold text-red-800">Печатът е отказан</h1>
+        <p className="mt-2 text-sm text-red-700">{message}</p>
+        <Link href="/invoices" className="mt-4 inline-block text-sm text-blue-600 underline">
+          ← Назад към фактури
+        </Link>
+      </div>
+    </div>
+  )
 }
 
 export default async function InvoicePrintPage({ params }: { params: { id: string } }) {
-  const role = await getCurrentRole()
+  const { companyId: CO, role } = await getCurrentUserContext()
 
   if (!can(role, 'manage_invoices')) {
     return (
@@ -125,45 +150,80 @@ export default async function InvoicePrintPage({ params }: { params: { id: strin
     )
   }
 
-  const sb = createAdminClient()
+  const sb = await createClient()
   const { id } = params
 
-  const [{ data: rawInvoice }, { data: rawItems }] = await Promise.all([
-    sb
-      .from('invoices')
-      .select('*, customers(id, name, email, phone, address, eik, vat_number, mol), outgoing_orders(id, order_number, customer_name)')
-      .eq('id', id)
-      .eq('company_id', CO)
-      .single(),
-    sb
-      .from('invoice_items')
-      .select('*, products(name, unit)')
-      .eq('invoice_id', id)
-      .eq('company_id', CO)
-      .order('created_at', { ascending: true }),
-  ])
+  // Prove ownership of the parent before reading any child or snapshot row.
+  const { data: rawInvoice, error: invoiceError } = await sb
+    .from('invoices')
+    .select('*')
+    .eq('id', id)
+    .eq('company_id', CO)
+    .maybeSingle()
 
-  if (!rawInvoice) notFound()
+  if (invoiceError || !rawInvoice) notFound()
 
   const invoice = rawInvoice as unknown as InvoiceRow
-  const items   = (rawItems ?? []) as unknown as ItemRow[]
+  const orderPromise = invoice.outgoing_order_id
+    ? sb
+        .from('outgoing_orders')
+        .select('id, order_number, customer_name')
+        .eq('id', invoice.outgoing_order_id)
+        .eq('company_id', CO)
+        .maybeSingle()
+    : Promise.resolve({ data: null, error: null })
 
-  // Issuer identity — env vars, all optional (empty string = omit the line)
-  const issuer = {
-    name:    process.env.NEXT_PUBLIC_COMPANY_NAME    || 'StockFlow Demo',
-    address: process.env.NEXT_PUBLIC_COMPANY_ADDRESS || '',
-    eik:     process.env.NEXT_PUBLIC_COMPANY_EIK     || '',
-    vat:     process.env.NEXT_PUBLIC_COMPANY_VAT     || '',
-    mol:     process.env.NEXT_PUBLIC_COMPANY_MOL     || '',
-    email:   process.env.NEXT_PUBLIC_COMPANY_EMAIL   || '',
-    phone:   process.env.NEXT_PUBLIC_COMPANY_PHONE   || '',
-    bank:    process.env.NEXT_PUBLIC_COMPANY_BANK    || '',
-    iban:    process.env.NEXT_PUBLIC_COMPANY_IBAN    || '',
-    bic:     process.env.NEXT_PUBLIC_COMPANY_BIC     || '',
+  const [snapshotResult, itemsResult, customerResult, orderResult] = await Promise.all([
+    sb
+      .from('invoice_issuer_snapshots')
+      .select('legal_name, address, eik, vat_number, mol, email, phone, bank_name, iban, bic')
+      .eq('invoice_id', invoice.id)
+      .eq('company_id', CO)
+      .maybeSingle(),
+    sb
+      .from('invoice_items')
+      .select('id, description, quantity, unit_price, amount')
+      .eq('invoice_id', invoice.id)
+      .eq('company_id', CO)
+      .order('created_at', { ascending: true }),
+    sb
+      .from('customers')
+      .select('id, name, email, phone, address, eik, vat_number, mol')
+      .eq('id', invoice.customer_id)
+      .eq('company_id', CO)
+      .maybeSingle(),
+    orderPromise,
+  ])
+
+  if (snapshotResult.error || !snapshotResult.data) {
+    return (
+      <PrintUnavailable message="Фактурата няма неизменяем snapshot на издателя. Исторически фактури без snapshot не се попълват от текущите настройки." />
+    )
+  }
+  if (itemsResult.error || customerResult.error || !customerResult.data || orderResult.error) {
+    return <PrintUnavailable message="Свързаните данни на фактурата не могат да бъдат потвърдени за текущата фирма." />
+  }
+  if (invoice.outgoing_order_id && !orderResult.data) {
+    return <PrintUnavailable message="Свързаната поръчка не може да бъде потвърдена за текущата фирма." />
   }
 
-  const customer    = invoice.customers
-  const linkedOrder = invoice.outgoing_orders
+  const snapshot = snapshotResult.data as IssuerSnapshot
+  const items = (itemsResult.data ?? []) as unknown as ItemRow[]
+  const issuer = {
+    name: snapshot.legal_name,
+    address: snapshot.address,
+    eik: snapshot.eik,
+    vat: snapshot.vat_number,
+    mol: snapshot.mol,
+    email: snapshot.email,
+    phone: snapshot.phone,
+    bank: snapshot.bank_name,
+    iban: snapshot.iban,
+    bic: snapshot.bic,
+  }
+
+  const customer = customerResult.data as CustomerJoin
+  const linkedOrder = orderResult.data as OrderJoin
   const balanceDue  = Math.max(
     0,
     Math.round((Number(invoice.total || 0) - Number(invoice.amount_paid || 0)) * 100) / 100,

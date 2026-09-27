@@ -4,8 +4,6 @@ import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requirePermission } from '@/lib/current-user'
 
-const CO = process.env.DEMO_COMPANY_ID!
-
 export type Customer = {
   id: string
   company_id: string
@@ -37,7 +35,7 @@ export type CustomerResult = { success: true } | { success: false; error: string
 
 export async function createCustomer(input: CustomerInput): Promise<CustomerResult> {
   try {
-    await requirePermission('manage_customers')
+    const { companyId: CO } = await requirePermission('manage_customers')
     const sb = createAdminClient()
     const { error } = await sb.from('customers').insert({
       company_id:  CO,
@@ -64,7 +62,7 @@ export async function createCustomer(input: CustomerInput): Promise<CustomerResu
 
 export async function updateCustomer(id: string, input: CustomerInput): Promise<CustomerResult> {
   try {
-    await requirePermission('manage_customers')
+    const { companyId: CO } = await requirePermission('manage_customers')
     const sb = createAdminClient()
     const { error } = await sb
       .from('customers')
@@ -93,7 +91,7 @@ export async function updateCustomer(id: string, input: CustomerInput): Promise<
 
 export async function deactivateCustomer(id: string): Promise<CustomerResult> {
   try {
-    await requirePermission('manage_customers')
+    const { companyId: CO } = await requirePermission('manage_customers')
     const sb = createAdminClient()
     const { error } = await sb
       .from('customers')
@@ -110,7 +108,7 @@ export async function deactivateCustomer(id: string): Promise<CustomerResult> {
 
 export async function restoreCustomer(id: string): Promise<CustomerResult> {
   try {
-    await requirePermission('manage_customers')
+    const { companyId: CO } = await requirePermission('manage_customers')
     const sb = createAdminClient()
     const { error } = await sb
       .from('customers')

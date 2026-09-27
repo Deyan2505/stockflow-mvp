@@ -237,6 +237,8 @@ export function InvoiceDetailModal({ invoice, products, canManage, canIssue, onC
       if (!result.success) {
         const msg =
           result.error === 'errIssueNoItems' ? s.errIssueNoItems :
+          result.error === 'errIssuerSettingsRequired' ? s.errIssuerSettingsRequired :
+          result.error === 'errInvoiceTenantLink' ? s.errInvoiceTenantLink :
           result.error === 'errLocked'       ? s.errLocked :
           result.error
         setActionError(msg)

@@ -24,7 +24,7 @@ export async function createWarehouse(input: WarehouseInput) {
   const sb = createAdminClient()
   const { error } = await sb
     .from('warehouses')
-    .insert({ ...input, company_id: companyId, status: 'active' })
+    .insert({ name: input.name, address: input.address, company_id: companyId, status: 'active' })
   if (error) throw new Error(error.message)
   revalidatePath('/')
   revalidatePath('/warehouses')
@@ -35,7 +35,7 @@ export async function updateWarehouse(id: string, input: WarehouseInput) {
   const sb = createAdminClient()
   const { error } = await sb
     .from('warehouses')
-    .update(input)
+    .update({ name: input.name, address: input.address })
     .eq('id', id)
     .eq('company_id', companyId)
   if (error) throw new Error(error.message)

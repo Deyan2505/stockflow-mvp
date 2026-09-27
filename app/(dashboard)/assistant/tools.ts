@@ -2,11 +2,10 @@
 // Server-only — imported exclusively by actions.ts which has 'use server'.
 // Zero mutations: no insert/update/delete/upsert/rpc/revalidatePath.
 
-import { getCurrentRole } from '@/lib/current-user'
+import { getCurrentUserContext } from '@/lib/current-user'
 import { can } from '@/lib/permissions'
 import { createAdminClient } from '@/lib/supabase/admin'
 
-const CO = process.env.DEMO_COMPANY_ID!
 const LIMIT = 50
 
 // ─── OpenAI tool schemas ──────────────────────────────────────────────────────
@@ -212,6 +211,7 @@ export async function executeTool(
   input: Record<string, unknown>,
 ): Promise<unknown> {
   try {
+    await getCurrentUserContext()
     switch (name) {
       case 'get_products':
         return await getProducts(input.search as string | undefined)
@@ -264,7 +264,7 @@ export async function executeTool(
 // ─── Individual tool functions ────────────────────────────────────────────────
 
 async function getProducts(search?: string) {
-  const role = await getCurrentRole()
+  const { role, companyId: CO } = await getCurrentUserContext()
   if (!can(role, 'view_products')) throw new Error('Unauthorized: view_products required')
 
   const sb = createAdminClient()
@@ -304,7 +304,7 @@ async function getProducts(search?: string) {
 }
 
 async function getInventory(product_name?: string, warehouse_name?: string) {
-  const role = await getCurrentRole()
+  const { role, companyId: CO } = await getCurrentUserContext()
   if (!can(role, 'view_inventory')) throw new Error('Unauthorized: view_inventory required')
 
   const sb = createAdminClient()
@@ -313,6 +313,9 @@ async function getInventory(product_name?: string, warehouse_name?: string) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .select('quantity_available, products(name, unit), locations(code, warehouses(name))' as any)
     .eq('company_id', CO)
+    .eq('products.company_id', CO)
+    .eq('locations.company_id', CO)
+    .eq('locations.warehouses.company_id', CO)
     .gt('quantity_available', 0)
     .order('quantity_available', { ascending: false })
     .limit(LIMIT)
@@ -350,7 +353,7 @@ async function getInventory(product_name?: string, warehouse_name?: string) {
 }
 
 async function getLowStock() {
-  const role = await getCurrentRole()
+  const { role, companyId: CO } = await getCurrentUserContext()
   if (!can(role, 'view_inventory')) throw new Error('Unauthorized: view_inventory required')
 
   const sb = createAdminClient()
@@ -364,6 +367,9 @@ async function getLowStock() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .select('quantity_available, product_id, products(name, unit, min_quantity), locations(code, warehouses(name))' as any)
     .eq('company_id', CO)
+    .eq('products.company_id', CO)
+    .eq('locations.company_id', CO)
+    .eq('locations.warehouses.company_id', CO)
 
   if (error) throw new Error(error.message)
 
@@ -401,7 +407,7 @@ async function getMovements(
   movement_type?: 'IN' | 'OUT' | 'TRANSFER',
   limit = 20,
 ) {
-  const role = await getCurrentRole()
+  const { role, companyId: CO } = await getCurrentUserContext()
   if (!can(role, 'view_movements')) throw new Error('Unauthorized: view_movements required')
 
   const sb = createAdminClient()
@@ -410,6 +416,7 @@ async function getMovements(
     .from('stock_movements')
     .select('movement_type, quantity, created_at, note, reference_type, products(name)')
     .eq('company_id', CO)
+    .eq('products.company_id', CO)
     .order('created_at', { ascending: false })
     .limit(Math.min(limit, LIMIT))
 
@@ -445,7 +452,7 @@ async function getMovements(
 
 async function getDeliveries(status?: string, supplier_name?: string) {
   // No dedicated view_deliveries permission — all authenticated roles can view deliveries
-  await getCurrentRole() // ensures authentication
+  const { companyId: CO } = await getCurrentUserContext()
 
   const sb = createAdminClient()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -453,6 +460,7 @@ async function getDeliveries(status?: string, supplier_name?: string) {
     .from('incoming_deliveries')
     .select('delivery_number, status, expected_date, received_date, note, suppliers(name)')
     .eq('company_id', CO)
+    .eq('suppliers.company_id', CO)
     .order('created_at', { ascending: false })
     .limit(LIMIT)
 
@@ -487,7 +495,7 @@ async function getDeliveries(status?: string, supplier_name?: string) {
 
 async function getOrders(status?: string, customer_name?: string) {
   // No dedicated view_orders permission — all authenticated roles can view orders
-  await getCurrentRole() // ensures authentication
+  const { companyId: CO } = await getCurrentUserContext()
 
   const sb = createAdminClient()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -529,7 +537,7 @@ async function getOrders(status?: string, customer_name?: string) {
 }
 
 async function getCustomers(search?: string, status?: 'active' | 'inactive') {
-  const role = await getCurrentRole()
+  const { role, companyId: CO } = await getCurrentUserContext()
   if (!can(role, 'view_customers')) throw new Error('Unauthorized: view_customers required')
 
   const sb = createAdminClient()
@@ -576,7 +584,7 @@ async function getInvoices(
   payment_status?: string,
   customer_name?: string,
 ) {
-  const role = await getCurrentRole()
+  const { role, companyId: CO } = await getCurrentUserContext()
   if (!can(role, 'view_invoices')) throw new Error('Unauthorized: view_invoices required')
 
   const sb = createAdminClient()
@@ -585,6 +593,7 @@ async function getInvoices(
     .from('invoices')
     .select('invoice_number, status, payment_status, total, amount_paid, invoice_date, due_date, customers(name)')
     .eq('company_id', CO)
+    .eq('customers.company_id', CO)
     .order('created_at', { ascending: false })
     .limit(LIMIT)
 
@@ -623,7 +632,7 @@ async function getInvoices(
 }
 
 async function getInvoiceDetail(invoice_number: string) {
-  const role = await getCurrentRole()
+  const { role, companyId: CO } = await getCurrentUserContext()
   if (!can(role, 'view_invoices')) throw new Error('Unauthorized: view_invoices required')
 
   const sb = createAdminClient()
@@ -633,6 +642,8 @@ async function getInvoiceDetail(invoice_number: string) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .select('*, customers(name), outgoing_orders(order_number)' as any)
     .eq('company_id', CO)
+    .eq('customers.company_id', CO)
+    .eq('outgoing_orders.company_id', CO)
     .eq('invoice_number', invoice_number)
     .single()
 
@@ -650,6 +661,7 @@ async function getInvoiceDetail(invoice_number: string) {
       .select('description, quantity, unit_price, amount, products(name)' as any)
       .eq('invoice_id', invoice.id)
       .eq('company_id', CO)
+      .eq('products.company_id', CO)
       .order('created_at', { ascending: true }),
     sb
       .from('invoice_payments')
@@ -691,7 +703,7 @@ async function getInvoiceDetail(invoice_number: string) {
 }
 
 async function getStockValue() {
-  const role = await getCurrentRole()
+  const { role, companyId: CO } = await getCurrentUserContext()
   if (!can(role, 'view_inventory')) throw new Error('Unauthorized: view_inventory required')
 
   const sb = createAdminClient()
@@ -700,6 +712,7 @@ async function getStockValue() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .select('quantity_available, products(name, cost_price)' as any)
     .eq('company_id', CO)
+    .eq('products.company_id', CO)
 
   if (error) throw new Error(error.message)
 

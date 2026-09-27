@@ -1,22 +1,19 @@
 export const dynamic = 'force-dynamic'
 
 import { createAdminClient } from '@/lib/supabase/admin'
-import { getCurrentRole } from '@/lib/current-user'
+import { getCurrentUserContext } from '@/lib/current-user'
 import { can } from '@/lib/permissions'
 import { DashboardView, type Stats, type DayData, type RecentMovement, type ActiveDelivery, type OnboardingData } from './dashboard-view'
 
-const CO = process.env.DEMO_COMPANY_ID!
 const BG_DAYS = ['Нд', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб']
 const EN_DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 export default async function DashboardPage() {
+  const { companyId: CO, role } = await getCurrentUserContext()
   const sb = createAdminClient()
   const since7d = new Date()
   since7d.setDate(since7d.getDate() - 6)
   since7d.setHours(0, 0, 0, 0)
-
-  // Run role lookup in parallel with all DB queries
-  const rolePromise = getCurrentRole()
 
   const [
     { count: productCount },
@@ -45,7 +42,8 @@ export default async function DashboardPage() {
       .eq('company_id', CO),
     sb.from('inventory_balances')
       .select('product_id, quantity_available, products(cost_price)')
-      .eq('company_id', CO),
+      .eq('company_id', CO)
+      .eq('products.company_id', CO),
     sb.from('products')
       .select('id, name, sku, unit, min_quantity')
       .eq('company_id', CO).eq('status', 'active').gt('min_quantity', 0),
@@ -56,11 +54,16 @@ export default async function DashboardPage() {
     sb.from('stock_movements')
       .select('id, created_at, movement_type, quantity, reference_type, products(name, unit), from_loc:locations!from_location_id(code), to_loc:locations!to_location_id(code)')
       .eq('company_id', CO)
+      .eq('products.company_id', CO)
+      .eq('from_loc.company_id', CO)
+      .eq('to_loc.company_id', CO)
       .order('created_at', { ascending: false })
       .limit(8),
     sb.from('incoming_deliveries')
       .select('id, delivery_number, status, expected_date, suppliers(name), incoming_delivery_items(expected_quantity, received_quantity)')
       .eq('company_id', CO)
+      .eq('suppliers.company_id', CO)
+      .eq('incoming_delivery_items.company_id', CO)
       .in('status', ['expected', 'partially_received'])
       .order('created_at', { ascending: false })
       .limit(5),
@@ -79,8 +82,6 @@ export default async function DashboardPage() {
     sb.from('invoice_payments').select('id', { count: 'exact', head: true })
       .eq('company_id', CO),
   ])
-
-  const role = await rolePromise
 
   // ── Inventory calculations ─────────────────────────────────────────────────
   const stockByProduct = new Map<string, number>()

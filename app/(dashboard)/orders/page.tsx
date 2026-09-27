@@ -3,15 +3,14 @@ export const dynamic = 'force-dynamic'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { OrdersClient } from './orders-client'
 import type { Order, Product, Location } from './actions'
-import { getCurrentRole } from '@/lib/current-user'
+import { getCurrentUserContext } from '@/lib/current-user'
 import { can } from '@/lib/permissions'
 
-const CO = process.env.DEMO_COMPANY_ID!
 
 type CustomerOption = { id: string; name: string }
 
 export default async function OrdersPage() {
-  const role = await getCurrentRole()
+  const { companyId: CO, role } = await getCurrentUserContext()
   const canIssue = can(role, 'issue_stock')
   const canManage = can(role, 'manage_orders')
   const sb = createAdminClient()
@@ -32,6 +31,7 @@ export default async function OrdersPage() {
       .from('locations')
       .select('id, code, warehouses(name)')
       .eq('company_id', CO)
+      .eq('warehouses.company_id', CO)
       .eq('status', 'active')
       .order('code'),
     sb

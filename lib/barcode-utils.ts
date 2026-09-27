@@ -1,9 +1,8 @@
 'use server'
 
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getCurrentUserContext } from '@/lib/current-user'
 import { type Product } from '@/app/(dashboard)/products/actions'
-
-const CO = process.env.DEMO_COMPANY_ID!
 
 /**
  * Find an active product by its barcode value.
@@ -11,9 +10,9 @@ const CO = process.env.DEMO_COMPANY_ID!
  * Returns null if barcode is empty, not found, or archived.
  */
 export async function findProductByBarcode(
-  barcode: string,
-  companyId: string
+  barcode: string
 ): Promise<Product | null> {
+  const { companyId } = await getCurrentUserContext()
   const trimmed = barcode.trim()
   if (!trimmed) return null
 
@@ -51,6 +50,7 @@ export type LookupResult = {
  * Never creates stock movements or modifies inventory balances.
  */
 export async function lookupByBarcode(barcode: string): Promise<LookupResult | null> {
+  const { companyId: CO } = await getCurrentUserContext()
   const trimmed = barcode.trim()
   if (!trimmed) return null
 
@@ -71,6 +71,8 @@ export async function lookupByBarcode(barcode: string): Promise<LookupResult | n
     .from('inventory_balances')
     .select('quantity_available, locations ( code, warehouses ( name ) )')
     .eq('company_id', CO)
+    .eq('locations.company_id', CO)
+    .eq('locations.warehouses.company_id', CO)
     .eq('product_id', product.id)
     .gt('quantity_available', 0)
     .order('quantity_available', { ascending: false })

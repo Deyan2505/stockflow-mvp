@@ -71,10 +71,10 @@ export type MovementActionInput = MovementInput & {
 }
 
 export async function findProductForMovement(barcode: string): Promise<ProductForMovement | null> {
+  await requireAuthenticatedPermission('create_movement')
   const trimmed = barcode.trim()
   if (!trimmed) return null
-  const context = await requireAuthenticatedPermission('create_movement')
-  const product = await findProductByBarcode(trimmed, context.companyId)
+  const product = await findProductByBarcode(trimmed)
   if (!product) return null
   return { id: product.id, name: product.name }
 }
